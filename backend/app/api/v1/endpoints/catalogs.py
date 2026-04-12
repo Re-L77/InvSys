@@ -138,9 +138,22 @@ def delete_categoria(id_categoria: int, db: Session = Depends(get_db), _: UserRe
             {"id_categoria": id_categoria},
             "Categoria",
         )
+        # Check for foreign key references
+        products = db.execute(
+            text("SELECT COUNT(*) as cnt FROM Productos WHERE idCategoria = :id_categoria"),
+            {"id_categoria": id_categoria}
+        ).mappings().one()
+        if int(products["cnt"]) > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot delete categoria with associated products"
+            )
         db.execute(text("DELETE FROM Categorias WHERE idCategoria = :id_categoria"), {"id_categoria": id_categoria})
         db.commit()
         return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except HTTPException:
+        db.rollback()
+        raise
     except SQLAlchemyError as exc:
         db.rollback()
         _handle_sql_error(exc)
@@ -226,9 +239,22 @@ def delete_proveedor(id_proveedor: int, db: Session = Depends(get_db), _: UserRe
             {"id_proveedor": id_proveedor},
             "Proveedor",
         )
+        # Check for foreign key references
+        products = db.execute(
+            text("SELECT COUNT(*) as cnt FROM Productos WHERE idProveedor = :id_proveedor"),
+            {"id_proveedor": id_proveedor}
+        ).mappings().one()
+        if int(products["cnt"]) > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot delete proveedor with associated products"
+            )
         db.execute(text("DELETE FROM Proveedores WHERE idProveedor = :id_proveedor"), {"id_proveedor": id_proveedor})
         db.commit()
         return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except HTTPException:
+        db.rollback()
+        raise
     except SQLAlchemyError as exc:
         db.rollback()
         _handle_sql_error(exc)
@@ -298,9 +324,33 @@ def delete_almacen(id_almacen: int, db: Session = Depends(get_db), _: UserRead =
             {"id_almacen": id_almacen},
             "Almacen",
         )
+        # Check for foreign key references (inventario or movimientos)
+        inventory = db.execute(
+            text("SELECT COUNT(*) as cnt FROM Inventarios WHERE idAlmacen = :id_almacen"),
+            {"id_almacen": id_almacen}
+        ).mappings().one()
+        if int(inventory["cnt"]) > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot delete almacen with associated inventory"
+            )
+        
+        movements = db.execute(
+            text("SELECT COUNT(*) as cnt FROM Movimientos WHERE idAlmacen = :id_almacen"),
+            {"id_almacen": id_almacen}
+        ).mappings().one()
+        if int(movements["cnt"]) > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot delete almacen with associated movements"
+            )
+        
         db.execute(text("DELETE FROM Almacenes WHERE idAlmacen = :id_almacen"), {"id_almacen": id_almacen})
         db.commit()
         return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except HTTPException:
+        db.rollback()
+        raise
     except SQLAlchemyError as exc:
         db.rollback()
         _handle_sql_error(exc)
