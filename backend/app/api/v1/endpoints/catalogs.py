@@ -502,11 +502,20 @@ def delete_producto(id_producto: int, db: Session = Depends(get_db)) -> Response
 
 
 @router.get("/inventario")
-def list_inventario(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+def list_inventario(idAlmacen: int | None = None, bajoStock: bool | None = None, db: Session = Depends(get_db)) -> list[dict[str, Any]]:
     try:
+        conditions: list[str] = []
+        params: dict[str, Any] = {}
+        if idAlmacen is not None:
+            params["id_almacen"] = _clean_int(idAlmacen, "idAlmacen")
+            conditions.append("i.idAlmacen = :id_almacen")
+        if bajoStock:
+            conditions.append("p.stockTotal <= p.stockMin")
+
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         rows = db.execute(
             text(
-                """
+                f"""
                 SELECT
                     i.idInventario,
                     i.idProducto,
@@ -517,9 +526,11 @@ def list_inventario(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
                 FROM Inventarios i
                 JOIN Productos p ON p.idProducto = i.idProducto
                 JOIN Almacenes a ON a.idAlmacen = i.idAlmacen
+                {where_clause}
                 ORDER BY i.idInventario
                 """
-            )
+            ),
+            params,
         ).mappings().all()
         return _rows_to_dicts(rows)
     except SQLAlchemyError as exc:
@@ -531,7 +542,7 @@ def get_inventario(id_producto: int, id_almacen: int, db: Session = Depends(get_
     try:
         return _require_row(
             db,
-            """
+                f"""
             SELECT
                 i.idInventario,
                 i.idProducto,
@@ -548,4 +559,85 @@ def get_inventario(id_producto: int, id_almacen: int, db: Session = Depends(get_
             "Inventario",
         )
     except SQLAlchemyError as exc:
+        _handle_sql_error(exc)
+
+
+@router.get("/inventario/bajo-stock")
+def list_inventario_bajo_stock(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+    try:
+        rows = db.execute(
+            text(
+                """
+                SELECT
+                    p.idProducto,
+                    p.nombre,
+                    p.idCategoria,
+                    p.idProveedor,
+                    p.precio,
+                    p.stockTotal,
+                    p.stockMin
+                FROM Productos p
+                WHERE p.stockTotal <= p.stockMin
+                ORDER BY p.stockTotal ASC, p.idProducto ASC
+                """
+            )
+        ).mappings().all()
+        return _rows_to_dicts(rows)
+    except SQLAlchemyError as exc:
+        _handle_sql_error(exc)
+
+
+@router.post("/inventario/ajustes", status_code=status.HTTP_201_CREATED)
+def create_inventario_ajuste(payload: dict[str, Any], db: Session = Depends(get_db)) -> dict[str, Any]:
+    id_producto = _clean_int(payload.get("idProducto"), "idProducto")
+    id_almacen = _clean_int(payload.get("idAlmacen"), "idAlmacen")
+    cantidad = payload.get("cantidad")
+    motivo = _clean_text(payload.get("motivo"), "motivo", 3, 255)
+
+    if isinstance(cantidad, bool) or not isinstance(cantidad, int):
+        raise HTTPException(status_code=422, detail="cantidad must be an integer")
+    if cantidad == 0:
+        raise HTTPException(status_code=422, detail="cantidad cannot be zero")
+
+    try:
+        inventario = _require_row(
+            db,
+            "SELECT idInventario, stockLocal FROM Inventarios WHERE idProducto = :id_producto AND idAlmacen = :id_almacen",
+            {"id_producto": id_producto, "id_almacen": id_almacen},
+            "Inventario",
+        )
+        producto = _require_row(
+            db,
+            "SELECT idProducto, stockTotal FROM Productos WHERE idProducto = :id_producto",
+            {"id_producto": id_producto},
+            "Producto",
+        )
+
+        new_stock_local = int(inventario["stockLocal"]) + cantidad
+        new_stock_total = int(producto["stockTotal"]) + cantidad
+        if new_stock_local < 0 or new_stock_total < 0:
+            raise HTTPException(status_code=409, detail="Ajuste would result in negative stock")
+
+        db.execute(
+            text("UPDATE Inventarios SET stockLocal = :stock_local WHERE idProducto = :id_producto AND idAlmacen = :id_almacen"),
+            {"stock_local": new_stock_local, "id_producto": id_producto, "id_almacen": id_almacen},
+        )
+        db.execute(
+            text("UPDATE Productos SET stockTotal = :stock_total WHERE idProducto = :id_producto"),
+            {"stock_total": new_stock_total, "id_producto": id_producto},
+        )
+        db.commit()
+        return {
+            "idProducto": id_producto,
+            "idAlmacen": id_almacen,
+            "cantidad": cantidad,
+            "motivo": motivo,
+            "stockLocal": new_stock_local,
+            "stockTotal": new_stock_total,
+        }
+    except HTTPException:
+        db.rollback()
+        raise
+    except SQLAlchemyError as exc:
+        db.rollback()
         _handle_sql_error(exc)
