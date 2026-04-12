@@ -32,6 +32,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
+cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
@@ -39,6 +40,7 @@ El backend quedará disponible en:
 
 - `http://127.0.0.1:8000/`
 - `http://127.0.0.1:8000/health`
+- `http://127.0.0.1:8000/api/v1/health/db`
 - `http://127.0.0.1:8000/docs`
 
 ### 3. Frontend
@@ -70,6 +72,7 @@ py -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -r requirements.txt
+copy .env.example .env
 uvicorn app.main:app --reload
 ```
 
@@ -108,6 +111,12 @@ El backend usa estos valores por defecto:
 - `cors_origins`: `http://localhost:5173`
 
 Si quieres cambiar la base de datos o el origen del frontend, edita `backend/app/core/config.py`.
+
+Para comprobar conexión a base de datos, usa este endpoint:
+
+- `GET /api/v1/health/db`
+
+Si la conexión es correcta retorna `{"status": "ok", "database": "connected"}`.
 
 ## Notas
 
