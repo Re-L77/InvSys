@@ -7,9 +7,10 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.api.v1.endpoints.auth import require_access_user
 from app.db.session import get_db
 
-router = APIRouter(tags=["reportes"])
+router = APIRouter(tags=["reportes"], dependencies=[Depends(require_access_user)])
 
 
 def _handle_sql_error(exc: SQLAlchemyError) -> None:

@@ -7,9 +7,10 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.api.v1.endpoints.auth import require_access_user
 from app.db.session import get_db
 
-router = APIRouter(tags=["catalogs"])
+router = APIRouter(tags=["catalogs"], dependencies=[Depends(require_access_user)])
 
 
 class NotFoundError(Exception):
@@ -306,11 +307,29 @@ def delete_almacen(id_almacen: int, db: Session = Depends(get_db)) -> Response:
 
 
 @router.get("/productos")
-def list_productos(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+def list_productos(
+    q: str | None = None,
+    idCategoria: int | None = None,
+    idProveedor: int | None = None,
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
     try:
+        conditions: list[str] = []
+        params: dict[str, Any] = {}
+        if q is not None and q.strip():
+            params["q"] = f"%{q.strip()}%"
+            conditions.append("p.nombre LIKE :q")
+        if idCategoria is not None:
+            params["id_categoria"] = _clean_int(idCategoria, "idCategoria")
+            conditions.append("p.idCategoria = :id_categoria")
+        if idProveedor is not None:
+            params["id_proveedor"] = _clean_int(idProveedor, "idProveedor")
+            conditions.append("p.idProveedor = :id_proveedor")
+
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         rows = db.execute(
             text(
-                """
+                f"""
                 SELECT
                     p.idProducto,
                     p.nombre,
@@ -324,9 +343,11 @@ def list_productos(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
                 FROM Productos p
                 JOIN Categorias c ON c.idCategoria = p.idCategoria
                 JOIN Proveedores pr ON pr.idProveedor = p.idProveedor
+                {where_clause}
                 ORDER BY p.idProducto
                 """
-            )
+            ),
+            params,
         ).mappings().all()
         return _rows_to_dicts(rows)
     except SQLAlchemyError as exc:

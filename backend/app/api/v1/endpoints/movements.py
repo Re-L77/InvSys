@@ -8,9 +8,10 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.api.v1.endpoints.auth import require_access_user
 from app.db.session import get_db
 
-router = APIRouter(tags=["movimientos"])
+router = APIRouter(tags=["movimientos"], dependencies=[Depends(require_access_user)])
 
 
 def _handle_sql_error(exc: SQLAlchemyError) -> None:

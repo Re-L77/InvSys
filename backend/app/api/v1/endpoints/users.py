@@ -10,9 +10,10 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.api.v1.endpoints.auth import require_access_user
 from app.db.session import get_db
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(prefix="/users", tags=["users"], dependencies=[Depends(require_access_user)])
 
 APP_ROLE_TO_DB_ROLE = {
     "admin": "admin_role",
