@@ -1,28 +1,75 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
-import { User, users, UserRole } from '../../shared/data/mockData';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { UserRole } from '../../shared/data/mockData';
+import { apiRequest, getStoredAccessToken, setStoredAccessToken } from '../../shared/api/client';
+
+export interface SessionUser {
+  username: string;
+  role: UserRole;
+  displayName: string;
+}
 
 interface AuthContextType {
-  currentUser: User | null;
-  login: (username: string, password: string) => boolean;
-  logout: () => void;
+  currentUser: SessionUser | null;
+  isLoading: boolean;
+  login: (username: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
   hasAccess: (allowedRoles: UserRole[]) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const login = (username: string, password: string): boolean => {
-    const user = users.find(u => u.username === username && u.password === password);
-    if (user) {
-      setCurrentUser(user);
+  useEffect(() => {
+    const bootstrapSession = async () => {
+      const storedToken = getStoredAccessToken();
+
+      if (!storedToken) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const profile = await apiRequest<SessionUser>('/auth/me');
+        setCurrentUser(profile);
+      } catch {
+        setStoredAccessToken(null);
+        setCurrentUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void bootstrapSession();
+  }, []);
+
+  const login = async (username: string, password: string): Promise<boolean> => {
+    try {
+      const response = await apiRequest<{ accessToken: string; refreshToken: string; user: SessionUser }>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      });
+
+      setStoredAccessToken(response.accessToken);
+      setCurrentUser(response.user);
       return true;
+    } catch {
+      setStoredAccessToken(null);
+      setCurrentUser(null);
+      return false;
     }
-    return false;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await apiRequest('/auth/logout', { method: 'POST' });
+    } catch {
+      // If the session is already invalid, just clear the local state.
+    }
+
+    setStoredAccessToken(null);
     setCurrentUser(null);
   };
 
@@ -32,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, login, logout, hasAccess }}>
+    <AuthContext.Provider value={{ currentUser, isLoading, login, logout, hasAccess }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,41 +1,172 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { StockBadge } from '../shared/components/StockBadge';
-import { productos, categorias, proveedores, getNivelStock } from '../shared/data/mockData';
 import { useAuth } from '../core/auth/AuthContext';
 import { Pencil, Trash2, Plus, Search } from 'lucide-react';
+import { createProducto, deleteProducto, getProductos, updateProducto, type ProductoRecord } from '../shared/api/inventory';
+import { getStockLevel } from '../shared/utils/inventory';
+import { toast } from 'sonner';
 
 export function Productos() {
   const { currentUser } = useAuth();
+  const [productos, setProductos] = useState<ProductoRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategoria, setFilterCategoria] = useState('');
-  const [filterProveedor, setFilterProveedor] = useState('');
   const [filterNivel, setFilterNivel] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedProducto, setSelectedProducto] = useState<any>(null);
+  const [selectedProducto, setSelectedProducto] = useState<ProductoRecord | null>(null);
+  const [formNombre, setFormNombre] = useState('');
+  const [formCategoria, setFormCategoria] = useState('');
+  const [formProveedor, setFormProveedor] = useState('');
+  const [formPrecio, setFormPrecio] = useState('');
+  const [formStockMin, setFormStockMin] = useState('10');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const loadProductos = async () => {
+      setIsLoading(true);
+      setError('');
+
+      try {
+        setProductos(await getProductos());
+      } catch (requestError) {
+        setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar los productos');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadProductos();
+  }, []);
 
   const isAdmin = currentUser?.role === 'admin';
 
-  // Filter products
+  const categorias = Array.from(new Map(productos.map(p => [p.idCategoria, p.categoriaNombre])).entries()).map(([idCategoria, nombre]) => ({ idCategoria, nombre }));
+  const proveedores = Array.from(new Map(productos.map(p => [p.idProveedor, p.proveedorNombre])).entries()).map(([idProveedor, nombre]) => ({ idProveedor, nombre }));
+
   const filteredProductos = productos.filter(p => {
     const matchesSearch = p.nombre.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategoria = !filterCategoria || p.idCategoria === parseInt(filterCategoria);
-    const matchesProveedor = !filterProveedor || p.idProveedor === parseInt(filterProveedor);
-    const matchesNivel = !filterNivel || getNivelStock(p.idProducto) === filterNivel;
-    return matchesSearch && matchesCategoria && matchesProveedor && matchesNivel;
+    const matchesNivel = !filterNivel || getStockLevel(p.stockTotal, p.stockMin) === filterNivel;
+    return matchesSearch && matchesNivel;
   });
 
   const productosWithDetails = filteredProductos.map(p => {
-    const categoria = categorias.find(c => c.idCategoria === p.idCategoria);
-    const proveedor = proveedores.find(pr => pr.idProveedor === p.idProveedor);
     return {
       ...p,
-      categoria: categoria?.nombre || '',
-      proveedor: proveedor?.nombre || '',
-      nivel: getNivelStock(p.idProducto)
+      nivel: getStockLevel(p.stockTotal, p.stockMin)
     };
   });
+
+  const reloadData = async () => {
+    setProductos(await getProductos());
+  };
+
+  const openCreate = () => {
+    setSelectedProducto(null);
+    setFormNombre('');
+    setFormCategoria(categorias[0]?.idCategoria ? String(categorias[0].idCategoria) : '');
+    setFormProveedor(proveedores[0]?.idProveedor ? String(proveedores[0].idProveedor) : '');
+    setFormPrecio('');
+    setFormStockMin('10');
+    setShowModal(true);
+  };
+
+  const openEdit = (producto: ProductoRecord) => {
+    setSelectedProducto(producto);
+    setFormNombre(producto.nombre);
+    setFormCategoria(String(producto.idCategoria));
+    setFormProveedor(String(producto.idProveedor));
+    setFormPrecio(String(producto.precio));
+    setFormStockMin(String(producto.stockMin));
+    setShowModal(true);
+  };
+
+  const handleSave = async () => {
+    const nombre = formNombre.trim();
+    const idCategoria = Number(formCategoria);
+    const idProveedor = Number(formProveedor);
+    const precio = Number(formPrecio);
+    const stockMin = Number(formStockMin);
+
+    if (!nombre || !idCategoria || !idProveedor || !Number.isFinite(precio) || precio <= 0 || !Number.isInteger(stockMin) || stockMin < 0) {
+      toast.error('Revisa los campos del producto');
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      if (selectedProducto) {
+        await updateProducto(selectedProducto.idProducto, {
+          nombre,
+          idCategoria,
+          idProveedor,
+          precio,
+          stockMin,
+          stockTotal: selectedProducto.stockTotal,
+        });
+        toast.success('Producto actualizado');
+      } else {
+        await createProducto({
+          nombre,
+          idCategoria,
+          idProveedor,
+          precio,
+          stockMin,
+        });
+        toast.success('Producto creado');
+      }
+
+      await reloadData();
+      setShowModal(false);
+    } catch (requestError) {
+      toast.error(requestError instanceof Error ? requestError.message : 'No se pudo guardar el producto');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedProducto) {
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      await deleteProducto(selectedProducto.idProducto);
+      toast.success('Producto eliminado');
+      await reloadData();
+      setShowDeleteModal(false);
+      setSelectedProducto(null);
+    } catch (requestError) {
+      toast.error(requestError instanceof Error ? requestError.message : 'No se pudo eliminar el producto');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout title="Productos">
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-600">
+          Cargando productos...
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout title="Productos">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">
+          {error}
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout title="Productos">
@@ -54,28 +185,6 @@ export function Productos() {
           </div>
 
           <select
-            value={filterCategoria}
-            onChange={(e) => setFilterCategoria(e.target.value)}
-            className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] shadow-sm font-medium text-gray-700"
-          >
-            <option value="">Todas las categorías</option>
-            {categorias.map(c => (
-              <option key={c.idCategoria} value={c.idCategoria}>{c.nombre}</option>
-            ))}
-          </select>
-
-          <select
-            value={filterProveedor}
-            onChange={(e) => setFilterProveedor(e.target.value)}
-            className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] shadow-sm font-medium text-gray-700"
-          >
-            <option value="">Todos los proveedores</option>
-            {proveedores.map(p => (
-              <option key={p.idProveedor} value={p.idProveedor}>{p.nombre}</option>
-            ))}
-          </select>
-
-          <select
             value={filterNivel}
             onChange={(e) => setFilterNivel(e.target.value)}
             className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] shadow-sm font-medium text-gray-700"
@@ -88,10 +197,7 @@ export function Productos() {
 
           {isAdmin && (
             <button
-              onClick={() => {
-                setSelectedProducto(null);
-                setShowModal(true);
-              }}
+              onClick={openCreate}
               className="px-5 py-3 bg-gradient-to-r from-[#1E3A5F] to-[#2d5a8f] text-white rounded-xl hover:shadow-lg hover:scale-[1.02] transition-all flex items-center gap-2 font-semibold shadow-md"
             >
               <Plus size={20} />
@@ -125,8 +231,8 @@ export function Productos() {
                 <tr key={p.idProducto} className="hover:bg-gray-50 transition-colors">
                   <td className="py-4 px-6 text-sm text-gray-500">{p.idProducto}</td>
                   <td className="py-4 px-6 text-sm text-gray-900 font-semibold">{p.nombre}</td>
-                  <td className="py-4 px-6 text-sm text-gray-600">{p.categoria}</td>
-                  <td className="py-4 px-6 text-sm text-gray-600">{p.proveedor}</td>
+                  <td className="py-4 px-6 text-sm text-gray-600">{p.categoriaNombre}</td>
+                  <td className="py-4 px-6 text-sm text-gray-600">{p.proveedorNombre}</td>
                   <td className="py-4 px-6 text-sm font-semibold text-gray-900">${p.precio.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
                   <td className="py-4 px-6">
                     <span className="text-sm font-bold text-blue-600">{p.stockTotal}</span>
@@ -139,10 +245,7 @@ export function Productos() {
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => {
-                            setSelectedProducto(p);
-                            setShowModal(true);
-                          }}
+                          onClick={() => openEdit(p)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         >
                           <Pencil size={18} />
@@ -186,13 +289,18 @@ export function Productos() {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Nombre</label>
                 <input
                   type="text"
-                  defaultValue={selectedProducto?.nombre}
+                  value={formNombre}
+                  onChange={(e) => setFormNombre(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:border-transparent shadow-sm"
                 />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Categoría</label>
-                <select className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:border-transparent shadow-sm">
+                <select
+                  value={formCategoria}
+                  onChange={(e) => setFormCategoria(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:border-transparent shadow-sm"
+                >
                   {categorias.map(c => (
                     <option key={c.idCategoria} value={c.idCategoria}>{c.nombre}</option>
                   ))}
@@ -200,7 +308,11 @@ export function Productos() {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Proveedor</label>
-                <select className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:border-transparent shadow-sm">
+                <select
+                  value={formProveedor}
+                  onChange={(e) => setFormProveedor(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:border-transparent shadow-sm"
+                >
                   {proveedores.map(p => (
                     <option key={p.idProveedor} value={p.idProveedor}>{p.nombre}</option>
                   ))}
@@ -213,7 +325,8 @@ export function Productos() {
                   <input
                     type="number"
                     step="0.01"
-                    defaultValue={selectedProducto?.precio}
+                    value={formPrecio}
+                    onChange={(e) => setFormPrecio(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:border-transparent shadow-sm"
                   />
                 </div>
@@ -222,7 +335,8 @@ export function Productos() {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Stock Mínimo</label>
                 <input
                   type="number"
-                  defaultValue={selectedProducto?.stockMin || 10}
+                  value={formStockMin}
+                  onChange={(e) => setFormStockMin(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:border-transparent shadow-sm"
                 />
               </div>
@@ -230,15 +344,17 @@ export function Productos() {
             <div className="flex gap-3 mt-8">
               <button
                 onClick={() => setShowModal(false)}
+                disabled={isSaving}
                 className="flex-1 px-5 py-3 border-2 border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors"
               >
                 Cancelar
               </button>
               <button
-                onClick={() => setShowModal(false)}
-                className="flex-1 px-5 py-3 bg-gradient-to-r from-[#1E3A5F] to-[#2d5a8f] text-white font-semibold rounded-xl hover:shadow-lg transition-all"
+                onClick={() => void handleSave()}
+                disabled={isSaving}
+                className="flex-1 px-5 py-3 bg-gradient-to-r from-[#1E3A5F] to-[#2d5a8f] text-white font-semibold rounded-xl hover:shadow-lg transition-all disabled:opacity-70"
               >
-                Guardar
+                {isSaving ? 'Guardando...' : 'Guardar'}
               </button>
             </div>
           </div>
@@ -265,15 +381,17 @@ export function Productos() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteModal(false)}
+                disabled={isSaving}
                 className="flex-1 px-5 py-3 border-2 border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors"
               >
                 Cancelar
               </button>
               <button
-                onClick={() => setShowDeleteModal(false)}
-                className="flex-1 px-5 py-3 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 hover:shadow-lg transition-all"
+                onClick={() => void handleDelete()}
+                disabled={isSaving}
+                className="flex-1 px-5 py-3 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 hover:shadow-lg transition-all disabled:opacity-70"
               >
-                Eliminar
+                {isSaving ? 'Eliminando...' : 'Eliminar'}
               </button>
             </div>
           </div>

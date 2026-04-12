@@ -1,39 +1,42 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { TipoBadge } from '../shared/components/TipoBadge';
-import { movimientos, detalleMovimientos, productos, almacenes } from '../shared/data/mockData';
+import { getHistorialMovimientos, type MovimientoHistorialRecord } from '../shared/api/inventory';
 import { Filter } from 'lucide-react';
 
 export function Historial() {
   const [filterTipo, setFilterTipo] = useState('');
   const [filterAlmacen, setFilterAlmacen] = useState('');
+  const [historial, setHistorial] = useState<MovimientoHistorialRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Combine data
-  const historial = movimientos.map(m => {
-    const detalle = detalleMovimientos.find(d => d.idMovimiento === m.idMovimiento);
-    const producto = productos.find(p => p.idProducto === detalle?.idProducto);
-    const almacen = almacenes.find(a => a.idAlmacen === m.idAlmacen);
+  useEffect(() => {
+    const loadHistorial = async () => {
+      setIsLoading(true);
+      setError('');
 
-    return {
-      ...m,
-      producto: producto?.nombre || '',
-      cantidad: detalle?.cantidad || 0,
-      almacen: almacen?.nombre || ''
+      try {
+        setHistorial(await getHistorialMovimientos());
+      } catch (requestError) {
+        setError(requestError instanceof Error ? requestError.message : 'No se pudo cargar el historial');
+      } finally {
+        setIsLoading(false);
+      }
     };
-  }).sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
-  // Filter
+    void loadHistorial();
+  }, []);
+
   const filteredHistorial = historial.filter(h => {
     const matchesTipo = !filterTipo || h.tipo === filterTipo;
-    const matchesAlmacen = !filterAlmacen || h.idAlmacen === parseInt(filterAlmacen);
+    const matchesAlmacen = !filterAlmacen || h.almacen.toLowerCase().includes(filterAlmacen.toLowerCase());
     return matchesTipo && matchesAlmacen;
   });
 
-  // Stats
   const totalEntradas = historial.filter(h => h.tipo === 'entrada').length;
   const totalSalidas = historial.filter(h => h.tipo === 'salida').length;
 
-  // Producto con más movimiento
   const productoMovimientos = new Map<string, number>();
   historial.forEach(h => {
     const count = productoMovimientos.get(h.producto) || 0;
@@ -41,6 +44,26 @@ export function Historial() {
   });
   const productoMasMovimiento = Array.from(productoMovimientos.entries())
     .sort((a, b) => b[1] - a[1])[0];
+
+  if (isLoading) {
+    return (
+      <DashboardLayout title="Historial de Movimientos">
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-600">
+          Cargando historial...
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout title="Historial de Movimientos">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">
+          {error}
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout title="Historial de Movimientos">
@@ -66,9 +89,11 @@ export function Historial() {
             className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] shadow-sm font-medium text-gray-700"
           >
             <option value="">Todos los almacenes</option>
-            {almacenes.map(a => (
-              <option key={a.idAlmacen} value={a.idAlmacen}>{a.nombre}</option>
-            ))}
+            <option value="almacén central">Almacén Central</option>
+            <option value="almacén norte">Almacén Norte</option>
+            <option value="almacén sur">Almacén Sur</option>
+            <option value="almacén este">Almacén Este</option>
+            <option value="almacén oeste">Almacén Oeste</option>
           </select>
 
           <div className="flex-1"></div>

@@ -1,38 +1,122 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { KPICard } from '../shared/components/KPICard';
 import { StockBadge } from '../shared/components/StockBadge';
-import { productos, categorias, proveedores, getNivelStock } from '../shared/data/mockData';
+import { getProductos, type ProductoRecord } from '../shared/api/inventory';
+import { formatCurrency, getStockLevel } from '../shared/utils/inventory';
 import { Archive, DollarSign, AlertTriangle, Download } from 'lucide-react';
 
 export function Inventario() {
   const [filterNivel, setFilterNivel] = useState('');
+  const [productos, setProductos] = useState<ProductoRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Calculate KPIs
+  useEffect(() => {
+    const loadInventario = async () => {
+      setIsLoading(true);
+      setError('');
+
+      try {
+        setProductos(await getProductos());
+      } catch (requestError) {
+        setError(requestError instanceof Error ? requestError.message : 'No se pudo cargar el inventario');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadInventario();
+  }, []);
+
   const unidadesTotales = productos.reduce((sum, p) => sum + p.stockTotal, 0);
   const valorTotal = productos.reduce((sum, p) => sum + (p.stockTotal * p.precio), 0);
-  const productosCriticos = productos.filter(p => getNivelStock(p.idProducto) === 'Bajo').length;
+  const productosCriticos = productos.filter(p => getStockLevel(p.stockTotal, p.stockMin) === 'Bajo').length;
 
-  // Filter products
   const filteredProductos = productos.filter(p => {
     if (!filterNivel) return true;
-    return getNivelStock(p.idProducto) === filterNivel;
+    return getStockLevel(p.stockTotal, p.stockMin) === filterNivel;
   });
 
-  const productosConDetalles = filteredProductos.map(p => {
-    const categoria = categorias.find(c => c.idCategoria === p.idCategoria);
-    const proveedor = proveedores.find(pr => pr.idProveedor === p.idProveedor);
-    const nivel = getNivelStock(p.idProducto);
-    const valorInventario = p.stockTotal * p.precio;
+  const productosConDetalles = filteredProductos.map(p => ({
+    ...p,
+    nivel: getStockLevel(p.stockTotal, p.stockMin),
+    valorInventario: p.stockTotal * p.precio,
+  }));
 
-    return {
-      ...p,
-      categoria: categoria?.nombre || '',
-      proveedor: proveedor?.nombre || '',
-      nivel,
-      valorInventario
+  const handleExport = () => {
+    if (productosConDetalles.length === 0) {
+      return;
+    }
+
+    const headers = [
+      'ID',
+      'Producto',
+      'Categoria',
+      'Proveedor',
+      'StockTotal',
+      'StockMin',
+      'Nivel',
+      'Precio',
+      'ValorInventario',
+    ];
+
+    const escapeCsv = (value: string | number) => {
+      const text = String(value ?? '');
+      if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+        return `"${text.replace(/"/g, '""')}"`;
+      }
+      return text;
     };
-  });
+
+    const rows = productosConDetalles.map((p) => [
+      p.idProducto,
+      p.nombre,
+      p.categoriaNombre,
+      p.proveedorNombre,
+      p.stockTotal,
+      p.stockMin,
+      p.nivel,
+      p.precio,
+      p.valorInventario,
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map((col) => escapeCsv(col)).join(','))
+      .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+
+    link.href = url;
+    link.setAttribute('download', `inventario-${timestamp}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout title="Inventario Actual">
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-600">
+          Cargando inventario...
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout title="Inventario Actual">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">
+          {error}
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout title="Inventario Actual">
@@ -87,7 +171,11 @@ export function Inventario() {
               </button>
             </div>
           </div>
-          <button className="px-5 py-2.5 border-2 border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={productosConDetalles.length === 0}
+            className="px-5 py-2.5 border-2 border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
             <Download size={18} />
             Exportar
           </button>
@@ -145,8 +233,8 @@ export function Inventario() {
                 >
                   <td className="py-4 px-6 text-sm text-gray-500">{p.idProducto}</td>
                   <td className="py-4 px-6 text-sm text-gray-900 font-semibold">{p.nombre}</td>
-                  <td className="py-4 px-6 text-sm text-gray-600">{p.categoria}</td>
-                  <td className="py-4 px-6 text-sm text-gray-600">{p.proveedor}</td>
+                  <td className="py-4 px-6 text-sm text-gray-600">{p.categoriaNombre}</td>
+                  <td className="py-4 px-6 text-sm text-gray-600">{p.proveedorNombre}</td>
                   <td className="py-4 px-6">
                     <span className="text-sm font-bold text-blue-600">{p.stockTotal}</span>
                   </td>
@@ -155,10 +243,10 @@ export function Inventario() {
                     <StockBadge nivel={p.nivel} />
                   </td>
                   <td className="py-4 px-6 text-sm font-semibold text-gray-900">
-                    ${p.precio.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    ${formatCurrency(p.precio)}
                   </td>
                   <td className="py-4 px-6 text-sm font-bold text-green-600">
-                    ${p.valorInventario.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    ${formatCurrency(p.valorInventario)}
                   </td>
                 </tr>
               ))}

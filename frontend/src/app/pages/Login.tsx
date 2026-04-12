@@ -7,14 +7,19 @@ export function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsSubmitting(true);
 
-    if (login(username, password)) {
+    const success = await login(username, password);
+    setIsSubmitting(false);
+
+    if (success) {
       navigate('/dashboard');
     } else {
       setError('Usuario o contraseña incorrectos');
@@ -95,9 +100,10 @@ export function Login() {
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-[#1E3A5F] to-[#2d5a8f] text-white py-3.5 rounded-xl hover:shadow-lg hover:scale-[1.02] transition-all font-semibold shadow-md"
+              disabled={isSubmitting}
+              className="w-full bg-gradient-to-r from-[#1E3A5F] to-[#2d5a8f] text-white py-3.5 rounded-xl hover:shadow-lg hover:scale-[1.02] transition-all font-semibold shadow-md disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              Iniciar Sesión
+              {isSubmitting ? 'Ingresando...' : 'Iniciar Sesión'}
             </button>
           </form>
 

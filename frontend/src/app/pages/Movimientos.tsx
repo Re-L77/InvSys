@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DashboardLayout } from '../layouts/DashboardLayout';
-import { almacenes, productos, getNivelStock, getStockLocal } from '../shared/data/mockData';
 import { useAuth } from '../core/auth/AuthContext';
 import { toast } from 'sonner';
 import { Minus, Plus, AlertTriangle } from 'lucide-react';
+import { createMovimiento, getAlmacenes, getProductos, type AlmacenRecord, type ProductoRecord } from '../shared/api/inventory';
+import { getStockLevel } from '../shared/utils/inventory';
 
 export function Movimientos() {
   const { currentUser } = useAuth();
@@ -11,32 +12,90 @@ export function Movimientos() {
   const [idAlmacen, setIdAlmacen] = useState('');
   const [idProducto, setIdProducto] = useState('');
   const [cantidad, setCantidad] = useState(1);
+  const [almacenes, setAlmacenes] = useState<AlmacenRecord[]>([]);
+  const [productos, setProductos] = useState<ProductoRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      setError('');
+
+      try {
+        const [almacenesData, productosData] = await Promise.all([getAlmacenes(), getProductos()]);
+        setAlmacenes(almacenesData);
+        setProductos(productosData);
+      } catch (requestError) {
+        setError(requestError instanceof Error ? requestError.message : 'No se pudo cargar el formulario');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadData();
+  }, []);
 
   const selectedProducto = productos.find(p => p.idProducto === parseInt(idProducto));
-  const stockLocal = idAlmacen && idProducto ? getStockLocal(parseInt(idProducto), parseInt(idAlmacen)) : 0;
-  const nivelStock = selectedProducto ? getNivelStock(selectedProducto.idProducto) : null;
+  const stockLocal = selectedProducto?.stockTotal ?? 0;
+  const nivelStock = selectedProducto ? getStockLevel(selectedProducto.stockTotal, selectedProducto.stockMin) : null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validar stock en caso de salida
-    if (tipo === 'salida' && cantidad > stockLocal) {
-      toast.error('❌ Error: No hay suficiente stock en este almacén');
+    if (!idAlmacen || !idProducto) {
+      toast.error('Selecciona almacén y producto');
       return;
     }
 
-    const productoNombre = selectedProducto?.nombre || '';
-    const almacenNombre = almacenes.find(a => a.idAlmacen === parseInt(idAlmacen))?.nombre || '';
+    setIsSubmitting(true);
 
-    toast.success(
-      `✅ ${tipo === 'entrada' ? 'Entrada' : 'Salida'} de ${cantidad} unidades de ${productoNombre} registrada exitosamente en ${almacenNombre}`
-    );
+    try {
+      const movimiento = await createMovimiento({
+        idAlmacen: parseInt(idAlmacen),
+        idProducto: parseInt(idProducto),
+        cantidad,
+        tipo,
+        usuario: currentUser?.username,
+      });
 
-    // Reset form
-    setIdAlmacen('');
-    setIdProducto('');
-    setCantidad(1);
+      const productoNombre = selectedProducto?.nombre || '';
+      const almacenNombre = almacenes.find(a => a.idAlmacen === parseInt(idAlmacen))?.nombre || '';
+
+      toast.success(
+        `✅ ${movimiento.tipo === 'entrada' ? 'Entrada' : 'Salida'} de ${cantidad} unidades de ${productoNombre} registrada exitosamente en ${almacenNombre}`
+      );
+
+      setIdAlmacen('');
+      setIdProducto('');
+      setCantidad(1);
+    } catch (requestError) {
+      toast.error(requestError instanceof Error ? requestError.message : 'No se pudo registrar el movimiento');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout title="Registrar Movimiento">
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-600">
+          Cargando formulario...
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout title="Registrar Movimiento">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">
+          {error}
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout title="Registrar Movimiento">
@@ -221,13 +280,14 @@ export function Movimientos() {
               </button>
               <button
                 type="submit"
+                disabled={isSubmitting}
                 className={`flex-1 px-6 py-4 text-white rounded-xl transition-all font-bold shadow-lg ${
                   tipo === 'entrada'
                     ? 'bg-gradient-to-r from-green-600 to-green-700 hover:shadow-green-500/50'
                     : 'bg-gradient-to-r from-red-600 to-red-700 hover:shadow-red-500/50'
-                }`}
+                } disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:shadow-lg`}
               >
-                Registrar {tipo === 'entrada' ? 'Entrada' : 'Salida'}
+                {isSubmitting ? 'Registrando...' : `Registrar ${tipo === 'entrada' ? 'Entrada' : 'Salida'}`}
               </button>
             </div>
           </form>

@@ -1,45 +1,74 @@
+import { useEffect, useState } from 'react';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { KPICard } from '../shared/components/KPICard';
 import { StockBadge } from '../shared/components/StockBadge';
 import { TipoBadge } from '../shared/components/TipoBadge';
 import { Package, Archive, AlertTriangle, DollarSign } from 'lucide-react';
-import { productos, getNivelStock, movimientos, detalleMovimientos, almacenes, categorias, proveedores } from '../shared/data/mockData';
+import { getHistorialMovimientos, getProductos, type MovimientoHistorialRecord, type ProductoRecord } from '../shared/api/inventory';
+import { getStockLevel, formatCurrency } from '../shared/utils/inventory';
 
 export function Dashboard() {
-  // Calculate KPIs
+  const [productos, setProductos] = useState<ProductoRecord[]>([]);
+  const [movimientos, setMovimientos] = useState<MovimientoHistorialRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const loadDashboard = async () => {
+      setIsLoading(true);
+      setError('');
+
+      try {
+        const [productosData, movimientosData] = await Promise.all([
+          getProductos(),
+          getHistorialMovimientos(),
+        ]);
+        setProductos(productosData);
+        setMovimientos(movimientosData);
+      } catch (requestError) {
+        setError(requestError instanceof Error ? requestError.message : 'No se pudo cargar el dashboard');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadDashboard();
+  }, []);
+
   const totalProductos = productos.length;
   const stockTotal = productos.reduce((sum, p) => sum + p.stockTotal, 0);
-  const productosCriticos = productos.filter(p => getNivelStock(p.idProducto) === 'Bajo').length;
+  const productosCriticos = productos.filter(p => getStockLevel(p.stockTotal, p.stockMin) === 'Bajo').length;
   const valorInventario = productos.reduce((sum, p) => sum + (p.stockTotal * p.precio), 0);
 
-  // Get productos with low stock
   const productosStockBajo = productos
-    .filter(p => getNivelStock(p.idProducto) === 'Bajo')
+    .filter(p => getStockLevel(p.stockTotal, p.stockMin) === 'Bajo')
     .slice(0, 5)
-    .map(p => {
-      const categoria = categorias.find(c => c.idCategoria === p.idCategoria);
-      const proveedor = proveedores.find(pr => pr.idProveedor === p.idProveedor);
-      return {
-        ...p,
-        categoria: categoria?.nombre || '',
-        proveedor: proveedor?.nombre || '',
-        nivel: getNivelStock(p.idProducto)
-      };
-    });
+    .map(p => ({
+      ...p,
+      nivel: getStockLevel(p.stockTotal, p.stockMin),
+    }));
 
-  // Get últimos movimientos
-  const ultimosMovimientos = [...movimientos]
-    .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
-    .slice(0, 5)
-    .map(m => {
-      const detalle = detalleMovimientos.find(d => d.idMovimiento === m.idMovimiento);
-      const producto = productos.find(p => p.idProducto === detalle?.idProducto);
-      return {
-        ...m,
-        producto: producto?.nombre || '',
-        cantidad: detalle?.cantidad || 0
-      };
-    });
+  const ultimosMovimientos = [...movimientos].slice(0, 5);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout title="Dashboard">
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-600">
+          Cargando datos del dashboard...
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout title="Dashboard">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">
+          {error}
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout title="Dashboard">
@@ -102,7 +131,7 @@ export function Dashboard() {
                     </td>
                     <td className="py-4 px-6 text-sm text-gray-600">{p.stockMin}</td>
                     <td className="py-4 px-6"><StockBadge nivel={p.nivel} /></td>
-                    <td className="py-4 px-6 text-sm text-gray-600">{p.proveedor}</td>
+                    <td className="py-4 px-6 text-sm text-gray-600">{p.proveedorNombre}</td>
                   </tr>
                 ))}
               </tbody>
@@ -117,8 +146,8 @@ export function Dashboard() {
             <p className="text-sm text-gray-500 mt-0.5">Actividad reciente</p>
           </div>
           <div className="p-4 space-y-3">
-            {ultimosMovimientos.map((m) => (
-              <div key={m.idMovimiento} className="p-3 rounded-lg border border-gray-100 hover:border-blue-200 hover:bg-blue-50/50 transition-all">
+            {ultimosMovimientos.map((m, index) => (
+              <div key={`${m.fecha}-${m.producto}-${m.usuario}-${index}`} className="p-3 rounded-lg border border-gray-100 hover:border-blue-200 hover:bg-blue-50/50 transition-all">
                 <div className="flex items-start justify-between mb-2">
                   <p className="text-sm font-semibold text-gray-900">{m.producto}</p>
                   <TipoBadge tipo={m.tipo} />
