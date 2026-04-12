@@ -249,24 +249,34 @@ CREATE USER IF NOT EXISTS 'admin_user'@'localhost' IDENTIFIED BY 'Admin123!';
 CREATE USER IF NOT EXISTS 'almacen_user'@'localhost' IDENTIFIED BY 'Almacen123!';
 CREATE USER IF NOT EXISTS 'super_user'@'localhost' IDENTIFIED BY 'Super123!';
 
+-- Nota: en entornos virtualizados (WSL/VM/contenedor), MariaDB puede ver al cliente
+-- con IP privada (por ejemplo 10.0.2.2) en lugar de localhost. Se crean estas cuentas
+-- adicionales para que las pruebas de roles desde el backend no fallen por host.
+CREATE USER IF NOT EXISTS 'admin_user'@'10.0.2.2' IDENTIFIED BY 'Admin123!';
+CREATE USER IF NOT EXISTS 'almacen_user'@'10.0.2.2' IDENTIFIED BY 'Almacen123!';
+CREATE USER IF NOT EXISTS 'super_user'@'10.0.2.2' IDENTIFIED BY 'Super123!';
+
 GRANT 'admin_role' TO 'admin_user'@'localhost';
 GRANT 'almacenista_role' TO 'almacen_user'@'localhost';
 GRANT 'supervisor_role' TO 'super_user'@'localhost';
+
+GRANT 'admin_role' TO 'admin_user'@'10.0.2.2';
+GRANT 'almacenista_role' TO 'almacen_user'@'10.0.2.2';
+GRANT 'supervisor_role' TO 'super_user'@'10.0.2.2';
 
 -- Establecer el rol por defecto para cada usuario (Sintaxis corregida para MariaDB)
 SET DEFAULT ROLE 'admin_role' FOR 'admin_user'@'localhost';
 SET DEFAULT ROLE 'almacenista_role' FOR 'almacen_user'@'localhost';
 SET DEFAULT ROLE 'supervisor_role' FOR 'super_user'@'localhost';
 
--- Restricción de accesos con REVOKE:
--- Se revoca explícitamente INSERT y DELETE sobre Productos para el almacenista,
--- asegurando que solo pueda consultar pero no modificar datos directamente.
-REVOKE INSERT, UPDATE, DELETE ON sistemaInventarios.Productos FROM 'almacenista_role';
--- Se revoca todo acceso directo a tablas base para el supervisor,
--- limitándolo exclusivamente a las vistas y al procedimiento de consulta.
-REVOKE ALL PRIVILEGES ON sistemaInventarios.Productos FROM 'supervisor_role';
-REVOKE ALL PRIVILEGES ON sistemaInventarios.Movimientos FROM 'supervisor_role';
-REVOKE ALL PRIVILEGES ON sistemaInventarios.detalleMovimientos FROM 'supervisor_role';
+SET DEFAULT ROLE 'admin_role' FOR 'admin_user'@'10.0.2.2';
+SET DEFAULT ROLE 'almacenista_role' FOR 'almacen_user'@'10.0.2.2';
+SET DEFAULT ROLE 'supervisor_role' FOR 'super_user'@'10.0.2.2';
+
+-- Nota de idempotencia:
+-- Este script solo otorga permisos mínimos por rol. No se usan REVOKE porque
+-- en MariaDB pueden fallar con ERROR 1147 si el privilegio no fue otorgado antes.
+-- Al definir permisos mínimos desde GRANT evitamos ese error en ejecuciones repetidas.
 
 FLUSH PRIVILEGES;
 

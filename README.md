@@ -40,6 +40,7 @@ El backend quedará disponible en:
 
 - `http://127.0.0.1:8000/`
 - `http://127.0.0.1:8000/health`
+- `http://127.0.0.1:8000/api/v1/auth/me`
 - `http://127.0.0.1:8000/api/v1/health/db`
 - `http://127.0.0.1:8000/docs`
 
@@ -112,11 +113,35 @@ El backend usa estos valores por defecto:
 
 Si quieres cambiar la base de datos o el origen del frontend, edita `backend/app/core/config.py`.
 
+Contrato API inicial (OpenAPI): `backend/openapi.contract.yaml`
+
 Para comprobar conexión a base de datos, usa este endpoint:
 
 - `GET /api/v1/health/db`
 
 Si la conexión es correcta retorna `{"status": "ok", "database": "connected"}`.
+
+### Verificación de roles y permisos (MariaDB)
+
+El backend debe usar una credencial técnica en `DATABASE_URL` (usuario de aplicación),
+mientras que la prueba de roles se hace con usuarios separados.
+
+1. Define en `backend/.env` estas variables:
+
+```env
+DB_TEST_ADMIN_URL=mysql+pymysql://admin_user:Admin123!@localhost:3307/sistemaInventarios
+DB_TEST_ALMACEN_URL=mysql+pymysql://almacen_user:Almacen123!@localhost:3307/sistemaInventarios
+DB_TEST_SUPER_URL=mysql+pymysql://super_user:Super123!@localhost:3307/sistemaInventarios
+```
+
+2. Ejecuta el validador:
+
+```bash
+cd backend
+python scripts/test_db_role_access.py
+```
+
+3. Si todo está bien, verás `PASS` en cada regla y resumen `N/N checks passed`.
 
 ## Notas
 

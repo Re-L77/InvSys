@@ -1,0 +1,1226 @@
+openapi: 3.0.3
+info:
+  title: InvSys API Contract
+  version: 0.1.0
+  description: Contrato inicial para frontend y backend del sistema de inventarios.
+servers:
+  - url: http://127.0.0.1:8000
+    description: Local
+
+tags:
+  - name: Auth
+  - name: Users
+  - name: Categorias
+  - name: Proveedores
+  - name: Productos
+  - name: Almacenes
+  - name: Inventario
+  - name: Movimientos
+  - name: Reportes
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Iniciar sesion
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Credenciales invalidas
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refrescar token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Token renovado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Refresh token invalido
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Cerrar sesion
+      responses:
+        '204':
+          description: Sesion cerrada
+
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Obtener usuario autenticado
+      responses:
+        '200':
+          description: Perfil actual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+        '401':
+          description: No autenticado
+
+  /api/v1/users:
+    get:
+      tags: [Users]
+      summary: Listar usuarios
+      responses:
+        '200':
+          description: Lista de usuarios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserRead'
+    post:
+      tags: [Users]
+      summary: Crear usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+        '409':
+          description: Usuario existente
+
+  /api/v1/users/{username}:
+    patch:
+      tags: [Users]
+      summary: Actualizar datos de usuario
+      parameters:
+        - $ref: '#/components/parameters/UsernamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+        '404':
+          description: Usuario no encontrado
+    delete:
+      tags: [Users]
+      summary: Eliminar usuario
+      parameters:
+        - $ref: '#/components/parameters/UsernamePath'
+      responses:
+        '204':
+          description: Usuario eliminado
+        '404':
+          description: Usuario no encontrado
+
+  /api/v1/users/{username}/password:
+    patch:
+      tags: [Users]
+      summary: Cambiar password de usuario
+      parameters:
+        - $ref: '#/components/parameters/UsernamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPasswordUpdate'
+      responses:
+        '204':
+          description: Password actualizada
+        '404':
+          description: Usuario no encontrado
+
+  /api/v1/users/{username}/role:
+    patch:
+      tags: [Users]
+      summary: Cambiar rol de usuario
+      parameters:
+        - $ref: '#/components/parameters/UsernamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRoleUpdate'
+      responses:
+        '200':
+          description: Rol actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRead'
+        '404':
+          description: Usuario no encontrado
+
+  /api/v1/categorias:
+    get:
+      tags: [Categorias]
+      summary: Listar categorias
+      responses:
+        '200':
+          description: Lista de categorias
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoriaRead'
+    post:
+      tags: [Categorias]
+      summary: Crear categoria
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoriaCreate'
+      responses:
+        '201':
+          description: Categoria creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoriaRead'
+
+  /api/v1/categorias/{idCategoria}:
+    get:
+      tags: [Categorias]
+      summary: Obtener categoria por id
+      parameters:
+        - $ref: '#/components/parameters/IdCategoriaPath'
+      responses:
+        '200':
+          description: Categoria encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoriaRead'
+        '404':
+          description: Categoria no encontrada
+    put:
+      tags: [Categorias]
+      summary: Actualizar categoria
+      parameters:
+        - $ref: '#/components/parameters/IdCategoriaPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoriaUpdate'
+      responses:
+        '200':
+          description: Categoria actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoriaRead'
+        '404':
+          description: Categoria no encontrada
+    delete:
+      tags: [Categorias]
+      summary: Eliminar categoria
+      parameters:
+        - $ref: '#/components/parameters/IdCategoriaPath'
+      responses:
+        '204':
+          description: Categoria eliminada
+        '409':
+          description: Categoria con productos asociados
+
+  /api/v1/proveedores:
+    get:
+      tags: [Proveedores]
+      summary: Listar proveedores
+      responses:
+        '200':
+          description: Lista de proveedores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProveedorRead'
+    post:
+      tags: [Proveedores]
+      summary: Crear proveedor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProveedorCreate'
+      responses:
+        '201':
+          description: Proveedor creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProveedorRead'
+        '409':
+          description: Email ya registrado
+
+  /api/v1/proveedores/{idProveedor}:
+    get:
+      tags: [Proveedores]
+      summary: Obtener proveedor por id
+      parameters:
+        - $ref: '#/components/parameters/IdProveedorPath'
+      responses:
+        '200':
+          description: Proveedor encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProveedorRead'
+        '404':
+          description: Proveedor no encontrado
+    put:
+      tags: [Proveedores]
+      summary: Actualizar proveedor
+      parameters:
+        - $ref: '#/components/parameters/IdProveedorPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProveedorUpdate'
+      responses:
+        '200':
+          description: Proveedor actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProveedorRead'
+        '404':
+          description: Proveedor no encontrado
+    delete:
+      tags: [Proveedores]
+      summary: Eliminar proveedor
+      parameters:
+        - $ref: '#/components/parameters/IdProveedorPath'
+      responses:
+        '204':
+          description: Proveedor eliminado
+        '409':
+          description: Proveedor con productos asociados
+
+  /api/v1/productos:
+    get:
+      tags: [Productos]
+      summary: Listar productos
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+          required: false
+          description: Texto de busqueda
+        - in: query
+          name: idCategoria
+          schema:
+            type: integer
+          required: false
+        - in: query
+          name: idProveedor
+          schema:
+            type: integer
+          required: false
+      responses:
+        '200':
+          description: Lista de productos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductoRead'
+    post:
+      tags: [Productos]
+      summary: Crear producto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductoCreate'
+      responses:
+        '201':
+          description: Producto creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductoRead'
+        '422':
+          description: Validacion fallida
+
+  /api/v1/productos/{idProducto}:
+    get:
+      tags: [Productos]
+      summary: Obtener producto por id
+      parameters:
+        - $ref: '#/components/parameters/IdProductoPath'
+      responses:
+        '200':
+          description: Producto encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductoRead'
+        '404':
+          description: Producto no encontrado
+    put:
+      tags: [Productos]
+      summary: Actualizar producto
+      parameters:
+        - $ref: '#/components/parameters/IdProductoPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductoUpdate'
+      responses:
+        '200':
+          description: Producto actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductoRead'
+        '404':
+          description: Producto no encontrado
+    delete:
+      tags: [Productos]
+      summary: Eliminar producto
+      parameters:
+        - $ref: '#/components/parameters/IdProductoPath'
+      responses:
+        '204':
+          description: Producto eliminado
+
+  /api/v1/almacenes:
+    get:
+      tags: [Almacenes]
+      summary: Listar almacenes
+      responses:
+        '200':
+          description: Lista de almacenes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AlmacenRead'
+    post:
+      tags: [Almacenes]
+      summary: Crear almacen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlmacenCreate'
+      responses:
+        '201':
+          description: Almacen creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlmacenRead'
+
+  /api/v1/almacenes/{idAlmacen}:
+    get:
+      tags: [Almacenes]
+      summary: Obtener almacen por id
+      parameters:
+        - $ref: '#/components/parameters/IdAlmacenPath'
+      responses:
+        '200':
+          description: Almacen encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlmacenRead'
+        '404':
+          description: Almacen no encontrado
+    put:
+      tags: [Almacenes]
+      summary: Actualizar almacen
+      parameters:
+        - $ref: '#/components/parameters/IdAlmacenPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlmacenUpdate'
+      responses:
+        '200':
+          description: Almacen actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlmacenRead'
+        '404':
+          description: Almacen no encontrado
+    delete:
+      tags: [Almacenes]
+      summary: Eliminar almacen
+      parameters:
+        - $ref: '#/components/parameters/IdAlmacenPath'
+      responses:
+        '204':
+          description: Almacen eliminado
+        '409':
+          description: Almacen con inventario o movimientos
+
+  /api/v1/inventario:
+    get:
+      tags: [Inventario]
+      summary: Consultar inventario consolidado
+      parameters:
+        - in: query
+          name: idAlmacen
+          schema:
+            type: integer
+          required: false
+        - in: query
+          name: bajoStock
+          schema:
+            type: boolean
+          required: false
+      responses:
+        '200':
+          description: Inventario
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InventarioRead'
+
+  /api/v1/inventario/{idProducto}/{idAlmacen}:
+    get:
+      tags: [Inventario]
+      summary: Consultar stock local por producto y almacen
+      parameters:
+        - $ref: '#/components/parameters/IdProductoPath'
+        - $ref: '#/components/parameters/IdAlmacenPath'
+      responses:
+        '200':
+          description: Stock local
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventarioRead'
+        '404':
+          description: Registro de inventario no encontrado
+
+  /api/v1/inventario/bajo-stock:
+    get:
+      tags: [Inventario]
+      summary: Listar productos con stock bajo
+      responses:
+        '200':
+          description: Productos con stock bajo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductoRead'
+
+  /api/v1/inventario/ajustes:
+    post:
+      tags: [Inventario]
+      summary: Ajuste manual de inventario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventarioAjusteRequest'
+      responses:
+        '201':
+          description: Ajuste aplicado
+        '422':
+          description: Ajuste invalido
+
+  /api/v1/movimientos:
+    get:
+      tags: [Movimientos]
+      summary: Listar movimientos
+      parameters:
+        - in: query
+          name: idAlmacen
+          schema:
+            type: integer
+        - in: query
+          name: tipo
+          schema:
+            type: string
+            enum: [entrada, salida]
+        - in: query
+          name: fechaDesde
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: fechaHasta
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Lista de movimientos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MovimientoRead'
+    post:
+      tags: [Movimientos]
+      summary: Registrar movimiento (transaccional)
+      description: Debe ejecutar el procedimiento sp_registrar_movimiento_completo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovimientoCreate'
+      responses:
+        '201':
+          description: Movimiento registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovimientoRead'
+        '409':
+          description: Stock insuficiente o conflicto de negocio
+        '422':
+          description: Validacion fallida
+
+  /api/v1/movimientos/{idMovimiento}:
+    get:
+      tags: [Movimientos]
+      summary: Obtener movimiento por id
+      parameters:
+        - $ref: '#/components/parameters/IdMovimientoPath'
+      responses:
+        '200':
+          description: Movimiento encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovimientoDetalleRead'
+        '404':
+          description: Movimiento no encontrado
+
+  /api/v1/movimientos/historial:
+    get:
+      tags: [Movimientos]
+      summary: Historial consolidado de movimientos
+      responses:
+        '200':
+          description: Historial
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HistorialMovimientoRead'
+
+  /api/v1/reportes/inventario-actual:
+    get:
+      tags: [Reportes]
+      summary: Reporte desde vista_inventario_actual
+      responses:
+        '200':
+          description: Reporte de inventario actual
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReporteInventarioActual'
+
+  /api/v1/reportes/historial-movimientos:
+    get:
+      tags: [Reportes]
+      summary: Reporte desde vista_historial_movimientos
+      responses:
+        '200':
+          description: Reporte de historial de movimientos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReporteHistorialMovimientos'
+
+  /api/v1/reportes/productos-mayor-movimiento:
+    get:
+      tags: [Reportes]
+      summary: Reporte de productos con mayor movimiento
+      responses:
+        '200':
+          description: Reporte de mayor movimiento
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReporteProductoMovimiento'
+
+  /api/v1/reportes/productos-bajo-promedio:
+    get:
+      tags: [Reportes]
+      summary: Productos con stock menor al promedio
+      responses:
+        '200':
+          description: Reporte de stock bajo promedio
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductoRead'
+
+  /api/v1/reportes/stock-local:
+    get:
+      tags: [Reportes]
+      summary: Consultar stock local usando fn_consultar_inventario
+      parameters:
+        - in: query
+          name: idProducto
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: idAlmacen
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Stock local
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [idProducto, idAlmacen, stockLocal]
+                properties:
+                  idProducto:
+                    type: integer
+                  idAlmacen:
+                    type: integer
+                  stockLocal:
+                    type: integer
+
+  /api/v1/reportes/nivel-stock/{idProducto}:
+    get:
+      tags: [Reportes]
+      summary: Nivel de stock usando fn_nivel_stock
+      parameters:
+        - $ref: '#/components/parameters/IdProductoPath'
+      responses:
+        '200':
+          description: Nivel de stock
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [idProducto, nivelStock]
+                properties:
+                  idProducto:
+                    type: integer
+                  nivelStock:
+                    type: string
+                    enum: [Bajo, Medio, Alto]
+
+  /api/v1/reportes/sp-consultar-inventario:
+    get:
+      tags: [Reportes]
+      summary: Reporte ejecutando sp_consultar_inventario
+      responses:
+        '200':
+          description: Resultado del procedimiento almacenado
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReporteInventarioProcedimiento'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UsernamePath:
+      in: path
+      name: username
+      required: true
+      schema:
+        type: string
+    IdCategoriaPath:
+      in: path
+      name: idCategoria
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    IdProveedorPath:
+      in: path
+      name: idProveedor
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    IdProductoPath:
+      in: path
+      name: idProducto
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    IdAlmacenPath:
+      in: path
+      name: idAlmacen
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    IdMovimientoPath:
+      in: path
+      name: idMovimiento
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+
+  schemas:
+    Role:
+      type: string
+      enum: [admin, almacenista, supervisor]
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+        password:
+          type: string
+          minLength: 6
+          maxLength: 128
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    LoginResponse:
+      type: object
+      required: [accessToken, refreshToken, tokenType, user]
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        tokenType:
+          type: string
+          example: bearer
+        user:
+          $ref: '#/components/schemas/UserRead'
+
+    UserBase:
+      type: object
+      required: [username, role]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+        role:
+          $ref: '#/components/schemas/Role'
+        displayName:
+          type: string
+          maxLength: 100
+
+    UserCreate:
+      allOf:
+        - $ref: '#/components/schemas/UserBase'
+        - type: object
+          required: [password]
+          properties:
+            password:
+              type: string
+              minLength: 8
+              maxLength: 128
+
+    UserUpdate:
+      type: object
+      properties:
+        displayName:
+          type: string
+          maxLength: 100
+
+    UserPasswordUpdate:
+      type: object
+      required: [newPassword]
+      properties:
+        newPassword:
+          type: string
+          minLength: 8
+          maxLength: 128
+
+    UserRoleUpdate:
+      type: object
+      required: [role]
+      properties:
+        role:
+          $ref: '#/components/schemas/Role'
+
+    UserRead:
+      allOf:
+        - $ref: '#/components/schemas/UserBase'
+
+    CategoriaBase:
+      type: object
+      required: [nombre]
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 50
+
+    CategoriaCreate:
+      allOf:
+        - $ref: '#/components/schemas/CategoriaBase'
+
+    CategoriaUpdate:
+      allOf:
+        - $ref: '#/components/schemas/CategoriaBase'
+
+    CategoriaRead:
+      allOf:
+        - $ref: '#/components/schemas/CategoriaBase'
+        - type: object
+          required: [idCategoria]
+          properties:
+            idCategoria:
+              type: integer
+
+    ProveedorBase:
+      type: object
+      required: [nombre, email]
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          maxLength: 100
+        telefono:
+          type: string
+          maxLength: 20
+
+    ProveedorCreate:
+      allOf:
+        - $ref: '#/components/schemas/ProveedorBase'
+
+    ProveedorUpdate:
+      allOf:
+        - $ref: '#/components/schemas/ProveedorBase'
+
+    ProveedorRead:
+      allOf:
+        - $ref: '#/components/schemas/ProveedorBase'
+        - type: object
+          required: [idProveedor]
+          properties:
+            idProveedor:
+              type: integer
+
+    ProductoBase:
+      type: object
+      required: [nombre, idCategoria, idProveedor, precio, stockMin]
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 100
+        idCategoria:
+          type: integer
+          minimum: 1
+        idProveedor:
+          type: integer
+          minimum: 1
+        precio:
+          type: number
+          format: float
+          exclusiveMinimum: 0
+        stockMin:
+          type: integer
+          minimum: 0
+
+    ProductoCreate:
+      allOf:
+        - $ref: '#/components/schemas/ProductoBase'
+
+    ProductoUpdate:
+      allOf:
+        - $ref: '#/components/schemas/ProductoBase'
+
+    ProductoRead:
+      allOf:
+        - $ref: '#/components/schemas/ProductoBase'
+        - type: object
+          required: [idProducto, stockTotal]
+          properties:
+            idProducto:
+              type: integer
+            stockTotal:
+              type: integer
+              minimum: 0
+
+    AlmacenBase:
+      type: object
+      required: [nombre]
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 100
+
+    AlmacenCreate:
+      allOf:
+        - $ref: '#/components/schemas/AlmacenBase'
+
+    AlmacenUpdate:
+      allOf:
+        - $ref: '#/components/schemas/AlmacenBase'
+
+    AlmacenRead:
+      allOf:
+        - $ref: '#/components/schemas/AlmacenBase'
+        - type: object
+          required: [idAlmacen]
+          properties:
+            idAlmacen:
+              type: integer
+
+    InventarioRead:
+      type: object
+      required: [idInventario, idProducto, idAlmacen, stockLocal]
+      properties:
+        idInventario:
+          type: integer
+        idProducto:
+          type: integer
+        idAlmacen:
+          type: integer
+        stockLocal:
+          type: integer
+          minimum: 0
+
+    InventarioAjusteRequest:
+      type: object
+      required: [idProducto, idAlmacen, cantidad, motivo]
+      properties:
+        idProducto:
+          type: integer
+          minimum: 1
+        idAlmacen:
+          type: integer
+          minimum: 1
+        cantidad:
+          type: integer
+        motivo:
+          type: string
+          minLength: 3
+          maxLength: 255
+
+    MovimientoCreate:
+      type: object
+      required: [idAlmacen, tipo, idProducto, cantidad]
+      properties:
+        idAlmacen:
+          type: integer
+          minimum: 1
+        tipo:
+          type: string
+          enum: [entrada, salida]
+        idProducto:
+          type: integer
+          minimum: 1
+        cantidad:
+          type: integer
+          minimum: 1
+        usuario:
+          type: string
+          description: Opcional, se toma del token si no se envia.
+
+    MovimientoRead:
+      type: object
+      required: [idMovimiento, idAlmacen, usuario, fecha, tipo]
+      properties:
+        idMovimiento:
+          type: integer
+        idAlmacen:
+          type: integer
+        usuario:
+          type: string
+        fecha:
+          type: string
+          format: date-time
+        tipo:
+          type: string
+          enum: [entrada, salida]
+
+    MovimientoDetalleRead:
+      allOf:
+        - $ref: '#/components/schemas/MovimientoRead'
+        - type: object
+          required: [detalles]
+          properties:
+            detalles:
+              type: array
+              items:
+                $ref: '#/components/schemas/DetalleMovimientoRead'
+
+    DetalleMovimientoRead:
+      type: object
+      required: [idDetalle, idMovimiento, idProducto, cantidad]
+      properties:
+        idDetalle:
+          type: integer
+        idMovimiento:
+          type: integer
+        idProducto:
+          type: integer
+        cantidad:
+          type: integer
+          minimum: 1
+
+    HistorialMovimientoRead:
+      type: object
+      required: [fecha, tipo, producto, cantidad, usuario, almacen]
+      properties:
+        fecha:
+          type: string
+          format: date-time
+        tipo:
+          type: string
+          enum: [entrada, salida]
+        producto:
+          type: string
+        cantidad:
+          type: integer
+        usuario:
+          type: string
+        almacen:
+          type: string
+
+    ReporteInventarioActual:
+      type: object
+      required: [producto, almacen, stockLocal, precio]
+      properties:
+        producto:
+          type: string
+        almacen:
+          type: string
+        stockLocal:
+          type: integer
+        precio:
+          type: number
+
+    ReporteHistorialMovimientos:
+      allOf:
+        - $ref: '#/components/schemas/HistorialMovimientoRead'
+
+    ReporteProductoMovimiento:
+      type: object
+      required: [idProducto, nombre, totalMovimientos, cantidadTotalMovida]
+      properties:
+        idProducto:
+          type: integer
+        nombre:
+          type: string
+        totalMovimientos:
+          type: integer
+        cantidadTotalMovida:
+          type: integer
+
+    ReporteInventarioProcedimiento:
+      type: object
+      required: [idProducto, producto, categoria, proveedor, stockTotal, stockMin, nivelStock, precio, valorInventario]
+      properties:
+        idProducto:
+          type: integer
+        producto:
+          type: string
+        categoria:
+          type: string
+        proveedor:
+          type: string
+        stockTotal:
+          type: integer
+        stockMin:
+          type: integer
+        nivelStock:
+          type: string
+          enum: [Bajo, Medio, Alto]
+        precio:
+          type: number
+        valorInventario:
+          type: number
