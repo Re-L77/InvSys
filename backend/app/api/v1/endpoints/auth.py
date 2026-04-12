@@ -172,6 +172,11 @@ def _resolve_user_from_token(token: str, expected_token_type: str) -> UserRead:
     return _build_user_read(username=username, role=role, display_name=display_name)
 
 
+def require_access_user(authorization: str | None = Header(default=None)) -> UserRead:
+    token = _extract_bearer_token(authorization)
+    return _resolve_user_from_token(token, "access")
+
+
 @router.post("/login", response_model=AuthResponse)
 def login(payload: LoginRequest) -> AuthResponse:
     base_url = make_url(settings.database_url)
@@ -212,5 +217,4 @@ def logout() -> Response:
 
 @router.get("/me", response_model=UserRead)
 def me(authorization: str | None = Header(default=None)) -> UserRead:
-    token = _extract_bearer_token(authorization)
-    return _resolve_user_from_token(token, "access")
+    return require_access_user(authorization)
