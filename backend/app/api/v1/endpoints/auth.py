@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
@@ -175,6 +175,36 @@ def _resolve_user_from_token(token: str, expected_token_type: str) -> UserRead:
 def require_access_user(authorization: str | None = Header(default=None)) -> UserRead:
     token = _extract_bearer_token(authorization)
     return _resolve_user_from_token(token, "access")
+
+
+def require_roles(*allowed_roles: str):
+    """
+    Factory function to create a dependency that validates user role.
+    
+    Usage in endpoint:
+        @router.get("/some-admin-endpoint")
+        def endpoint(user: UserRead = Depends(require_roles("admin"))):
+            ...
+    
+    Args:
+        *allowed_roles: One or more role strings (e.g., "admin", "almacenista")
+    
+    Returns:
+        A dependency function that validates the user has one of the allowed roles
+        
+    Raises:
+        HTTPException 403: If user role is not in allowed_roles
+        HTTPException 401: If authorization header is invalid
+    """
+    def _require_roles_impl(user: UserRead = Depends(require_access_user)) -> UserRead:
+        if user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Insufficient permissions. Required role(s): {', '.join(allowed_roles)}"
+            )
+        return user
+    
+    return _require_roles_impl
 
 
 @router.post("/login", response_model=AuthResponse)

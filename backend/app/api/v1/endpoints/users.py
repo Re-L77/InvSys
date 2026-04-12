@@ -10,10 +10,10 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.api.v1.endpoints.auth import require_access_user
+from app.api.v1.endpoints.auth import require_access_user, require_roles
 from app.db.session import get_db
 
-router = APIRouter(prefix="/users", tags=["users"], dependencies=[Depends(require_access_user)])
+router = APIRouter(prefix="/users", tags=["users"])
 
 APP_ROLE_TO_DB_ROLE = {
     "admin": "admin_role",
@@ -155,7 +155,7 @@ def _collect_users(db: Session) -> list[UserRead]:
 
 
 @router.get("")
-def list_users(db: Session = Depends(get_db)) -> list[UserRead]:
+def list_users(db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> list[UserRead]:
     try:
         return _collect_users(db)
     except SQLAlchemyError as exc:
@@ -163,7 +163,7 @@ def list_users(db: Session = Depends(get_db)) -> list[UserRead]:
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=UserRead)
-def create_user(payload: UserCreateRequest, db: Session = Depends(get_db)) -> UserRead:
+def create_user(payload: UserCreateRequest, db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> UserRead:
     username = _validate_username(payload.username)
     password = _validate_password(payload.password)
     role = _validate_role(payload.role)
@@ -190,7 +190,7 @@ def create_user(payload: UserCreateRequest, db: Session = Depends(get_db)) -> Us
 
 
 @router.patch("/{username}", response_model=UserRead)
-def update_user(username: str, payload: UserUpdateRequest, db: Session = Depends(get_db)) -> UserRead:
+def update_user(username: str, payload: UserUpdateRequest, db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> UserRead:
     username = _validate_username(username)
     try:
         hosts = _existing_hosts(db, username)
@@ -211,7 +211,7 @@ def update_user(username: str, payload: UserUpdateRequest, db: Session = Depends
 
 
 @router.patch("/{username}/password", status_code=status.HTTP_204_NO_CONTENT)
-def update_password(username: str, payload: UserPasswordUpdateRequest, db: Session = Depends(get_db)) -> Response:
+def update_password(username: str, payload: UserPasswordUpdateRequest, db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> Response:
     username = _validate_username(username)
     password = _validate_password(payload.new_password)
     try:
@@ -232,7 +232,7 @@ def update_password(username: str, payload: UserPasswordUpdateRequest, db: Sessi
 
 
 @router.patch("/{username}/role", response_model=UserRead)
-def update_role(username: str, payload: UserRoleUpdateRequest, db: Session = Depends(get_db)) -> UserRead:
+def update_role(username: str, payload: UserRoleUpdateRequest, db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> UserRead:
     username = _validate_username(username)
     role = _validate_role(payload.role)
     db_role = APP_ROLE_TO_DB_ROLE[role]
@@ -262,7 +262,7 @@ def update_role(username: str, payload: UserRoleUpdateRequest, db: Session = Dep
 
 
 @router.delete("/{username}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(username: str, db: Session = Depends(get_db)) -> Response:
+def delete_user(username: str, db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> Response:
     username = _validate_username(username)
     try:
         hosts = _existing_hosts(db, username)

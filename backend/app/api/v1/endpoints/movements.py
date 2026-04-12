@@ -8,10 +8,10 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.api.v1.endpoints.auth import require_access_user
+from app.api.v1.endpoints.auth import require_access_user, require_roles, UserRead
 from app.db.session import get_db
 
-router = APIRouter(tags=["movimientos"], dependencies=[Depends(require_access_user)])
+router = APIRouter(tags=["movimientos"])
 
 
 def _handle_sql_error(exc: SQLAlchemyError) -> None:
@@ -86,6 +86,7 @@ def list_movimientos(
     fechaDesde: str | None = None,
     fechaHasta: str | None = None,
     db: Session = Depends(get_db),
+    _: UserRead = Depends(require_roles("admin", "almacenista", "supervisor")),
 ) -> list[dict[str, Any]]:
     try:
         conditions: list[str] = []
@@ -131,7 +132,7 @@ def list_movimientos(
 
 
 @router.post("/movimientos", status_code=status.HTTP_201_CREATED)
-def create_movimiento(payload: dict[str, Any], db: Session = Depends(get_db)) -> dict[str, Any]:
+def create_movimiento(payload: dict[str, Any], db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin", "almacenista"))) -> dict[str, Any]:
     id_almacen = _require_int(payload.get("idAlmacen"), "idAlmacen")
     id_producto = _require_int(payload.get("idProducto"), "idProducto")
     cantidad = _require_int(payload.get("cantidad"), "cantidad")
@@ -169,7 +170,7 @@ def create_movimiento(payload: dict[str, Any], db: Session = Depends(get_db)) ->
 
 
 @router.get("/movimientos/{id_movimiento}")
-def get_movimiento(id_movimiento: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+def get_movimiento(id_movimiento: int, db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin", "almacenista", "supervisor"))) -> dict[str, Any]:
     try:
         return _movement_detail(db, _require_int(id_movimiento, "idMovimiento"))
     except SQLAlchemyError as exc:
@@ -177,7 +178,7 @@ def get_movimiento(id_movimiento: int, db: Session = Depends(get_db)) -> dict[st
 
 
 @router.get("/movimientos/historial")
-def historial_movimientos(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+def historial_movimientos(db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin", "almacenista", "supervisor"))) -> list[dict[str, Any]]:
     try:
         rows = db.execute(
             text(

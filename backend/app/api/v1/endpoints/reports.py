@@ -7,10 +7,10 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.api.v1.endpoints.auth import require_access_user
+from app.api.v1.endpoints.auth import require_access_user, require_roles, UserRead
 from app.db.session import get_db
 
-router = APIRouter(tags=["reportes"], dependencies=[Depends(require_access_user)])
+router = APIRouter(tags=["reportes"])
 
 
 def _handle_sql_error(exc: SQLAlchemyError) -> None:
@@ -18,7 +18,7 @@ def _handle_sql_error(exc: SQLAlchemyError) -> None:
 
 
 @router.get("/reportes/inventario-actual")
-def inventario_actual(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+def inventario_actual(db: Session = Depends(get_db), _: UserRead = Depends(require_access_user)) -> list[dict[str, Any]]:
     try:
         rows = db.execute(text("SELECT Producto, Almacen, stockLocal, precio FROM vista_inventario_actual ORDER BY Producto, Almacen")).mappings().all()
         return [dict(row) for row in rows]
@@ -27,7 +27,7 @@ def inventario_actual(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
 
 
 @router.get("/reportes/historial-movimientos")
-def historial_movimientos(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+def historial_movimientos(db: Session = Depends(get_db), _: UserRead = Depends(require_access_user)) -> list[dict[str, Any]]:
     try:
         rows = db.execute(
             text("SELECT fecha, tipo, Producto AS producto, cantidad, usuario, Almacen AS almacen FROM vista_historial_movimientos ORDER BY fecha DESC")
@@ -38,7 +38,7 @@ def historial_movimientos(db: Session = Depends(get_db)) -> list[dict[str, Any]]
 
 
 @router.get("/reportes/productos-mayor-movimiento")
-def productos_mayor_movimiento(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+def productos_mayor_movimiento(db: Session = Depends(get_db), _: UserRead = Depends(require_access_user)) -> list[dict[str, Any]]:
     try:
         rows = db.execute(
             text(
@@ -58,7 +58,7 @@ def productos_mayor_movimiento(db: Session = Depends(get_db)) -> list[dict[str, 
 
 
 @router.get("/reportes/productos-bajo-promedio")
-def productos_bajo_promedio(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+def productos_bajo_promedio(db: Session = Depends(get_db), _: UserRead = Depends(require_access_user)) -> list[dict[str, Any]]:
     try:
         rows = db.execute(
             text(
@@ -76,7 +76,7 @@ def productos_bajo_promedio(db: Session = Depends(get_db)) -> list[dict[str, Any
 
 
 @router.get("/reportes/stock-local")
-def stock_local(idProducto: int, idAlmacen: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+def stock_local(idProducto: int, idAlmacen: int, db: Session = Depends(get_db), _: UserRead = Depends(require_access_user)) -> dict[str, Any]:
     try:
         row = db.execute(
             text("SELECT fn_consultar_inventario(:id_producto, :id_almacen) AS stockLocal"),
@@ -88,7 +88,7 @@ def stock_local(idProducto: int, idAlmacen: int, db: Session = Depends(get_db)) 
 
 
 @router.get("/reportes/nivel-stock/{idProducto}")
-def nivel_stock(idProducto: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+def nivel_stock(idProducto: int, db: Session = Depends(get_db), _: UserRead = Depends(require_access_user)) -> dict[str, Any]:
     try:
         row = db.execute(
             text("SELECT fn_nivel_stock(:id_producto) AS nivelStock"),

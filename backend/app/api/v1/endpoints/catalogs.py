@@ -7,10 +7,10 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.api.v1.endpoints.auth import require_access_user
+from app.api.v1.endpoints.auth import require_access_user, require_roles, UserRead
 from app.db.session import get_db
 
-router = APIRouter(tags=["catalogs"], dependencies=[Depends(require_access_user)])
+router = APIRouter(tags=["catalogs"])
 
 
 class NotFoundError(Exception):
@@ -71,7 +71,7 @@ def _handle_sql_error(exc: SQLAlchemyError) -> None:
 
 
 @router.get("/categorias")
-def list_categorias(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+def list_categorias(db: Session = Depends(get_db), _: UserRead = Depends(require_access_user)) -> list[dict[str, Any]]:
     try:
         rows = db.execute(text("SELECT idCategoria, nombre FROM Categorias ORDER BY idCategoria")).mappings().all()
         return _rows_to_dicts(rows)
@@ -80,7 +80,7 @@ def list_categorias(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
 
 
 @router.get("/categorias/{id_categoria}")
-def get_categoria(id_categoria: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+def get_categoria(id_categoria: int, db: Session = Depends(get_db), _: UserRead = Depends(require_access_user)) -> dict[str, Any]:
     try:
         return _require_row(
             db,
@@ -93,7 +93,7 @@ def get_categoria(id_categoria: int, db: Session = Depends(get_db)) -> dict[str,
 
 
 @router.post("/categorias", status_code=status.HTTP_201_CREATED)
-def create_categoria(payload: dict[str, Any], db: Session = Depends(get_db)) -> dict[str, Any]:
+def create_categoria(payload: dict[str, Any], db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> dict[str, Any]:
     nombre = _clean_text(payload.get("nombre"), "nombre", 2, 50)
     try:
         result = db.execute(text("INSERT INTO Categorias (nombre) VALUES (:nombre)"), {"nombre": nombre})
@@ -108,7 +108,7 @@ def create_categoria(payload: dict[str, Any], db: Session = Depends(get_db)) -> 
 
 
 @router.put("/categorias/{id_categoria}")
-def update_categoria(id_categoria: int, payload: dict[str, Any], db: Session = Depends(get_db)) -> dict[str, Any]:
+def update_categoria(id_categoria: int, payload: dict[str, Any], db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> dict[str, Any]:
     nombre = _clean_text(payload.get("nombre"), "nombre", 2, 50)
     try:
         existing = _require_row(
@@ -130,7 +130,7 @@ def update_categoria(id_categoria: int, payload: dict[str, Any], db: Session = D
 
 
 @router.delete("/categorias/{id_categoria}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_categoria(id_categoria: int, db: Session = Depends(get_db)) -> Response:
+def delete_categoria(id_categoria: int, db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> Response:
     try:
         _require_row(
             db,
@@ -147,7 +147,7 @@ def delete_categoria(id_categoria: int, db: Session = Depends(get_db)) -> Respon
 
 
 @router.get("/proveedores")
-def list_proveedores(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+def list_proveedores(db: Session = Depends(get_db), _: UserRead = Depends(require_access_user)) -> list[dict[str, Any]]:
     try:
         rows = db.execute(
             text("SELECT idProveedor, nombre, email, telefono FROM Proveedores ORDER BY idProveedor")
@@ -158,7 +158,7 @@ def list_proveedores(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
 
 
 @router.get("/proveedores/{id_proveedor}")
-def get_proveedor(id_proveedor: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+def get_proveedor(id_proveedor: int, db: Session = Depends(get_db), _: UserRead = Depends(require_access_user)) -> dict[str, Any]:
     try:
         return _require_row(
             db,
@@ -171,7 +171,7 @@ def get_proveedor(id_proveedor: int, db: Session = Depends(get_db)) -> dict[str,
 
 
 @router.post("/proveedores", status_code=status.HTTP_201_CREATED)
-def create_proveedor(payload: dict[str, Any], db: Session = Depends(get_db)) -> dict[str, Any]:
+def create_proveedor(payload: dict[str, Any], db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> dict[str, Any]:
     nombre = _clean_text(payload.get("nombre"), "nombre", 2, 100)
     email = _clean_text(payload.get("email"), "email", 5, 100)
     telefono = _clean_text(payload.get("telefono", ""), "telefono", 0, 20)
@@ -188,7 +188,7 @@ def create_proveedor(payload: dict[str, Any], db: Session = Depends(get_db)) -> 
 
 
 @router.put("/proveedores/{id_proveedor}")
-def update_proveedor(id_proveedor: int, payload: dict[str, Any], db: Session = Depends(get_db)) -> dict[str, Any]:
+def update_proveedor(id_proveedor: int, payload: dict[str, Any], db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> dict[str, Any]:
     nombre = _clean_text(payload.get("nombre"), "nombre", 2, 100)
     email = _clean_text(payload.get("email"), "email", 5, 100)
     telefono = _clean_text(payload.get("telefono", ""), "telefono", 0, 20)
@@ -218,7 +218,7 @@ def update_proveedor(id_proveedor: int, payload: dict[str, Any], db: Session = D
 
 
 @router.delete("/proveedores/{id_proveedor}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_proveedor(id_proveedor: int, db: Session = Depends(get_db)) -> Response:
+def delete_proveedor(id_proveedor: int, db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> Response:
     try:
         _require_row(
             db,
@@ -235,7 +235,7 @@ def delete_proveedor(id_proveedor: int, db: Session = Depends(get_db)) -> Respon
 
 
 @router.get("/almacenes")
-def list_almacenes(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+def list_almacenes(db: Session = Depends(get_db), _: UserRead = Depends(require_access_user)) -> list[dict[str, Any]]:
     try:
         rows = db.execute(text("SELECT idAlmacen, nombre FROM Almacenes ORDER BY idAlmacen")).mappings().all()
         return _rows_to_dicts(rows)
@@ -244,7 +244,7 @@ def list_almacenes(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
 
 
 @router.get("/almacenes/{id_almacen}")
-def get_almacen(id_almacen: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+def get_almacen(id_almacen: int, db: Session = Depends(get_db), _: UserRead = Depends(require_access_user)) -> dict[str, Any]:
     try:
         return _require_row(
             db,
@@ -257,7 +257,7 @@ def get_almacen(id_almacen: int, db: Session = Depends(get_db)) -> dict[str, Any
 
 
 @router.post("/almacenes", status_code=status.HTTP_201_CREATED)
-def create_almacen(payload: dict[str, Any], db: Session = Depends(get_db)) -> dict[str, Any]:
+def create_almacen(payload: dict[str, Any], db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> dict[str, Any]:
     nombre = _clean_text(payload.get("nombre"), "nombre", 2, 100)
     try:
         result = db.execute(text("INSERT INTO Almacenes (nombre) VALUES (:nombre)"), {"nombre": nombre})
@@ -269,7 +269,7 @@ def create_almacen(payload: dict[str, Any], db: Session = Depends(get_db)) -> di
 
 
 @router.put("/almacenes/{id_almacen}")
-def update_almacen(id_almacen: int, payload: dict[str, Any], db: Session = Depends(get_db)) -> dict[str, Any]:
+def update_almacen(id_almacen: int, payload: dict[str, Any], db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> dict[str, Any]:
     nombre = _clean_text(payload.get("nombre"), "nombre", 2, 100)
     try:
         _require_row(
@@ -290,7 +290,7 @@ def update_almacen(id_almacen: int, payload: dict[str, Any], db: Session = Depen
 
 
 @router.delete("/almacenes/{id_almacen}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_almacen(id_almacen: int, db: Session = Depends(get_db)) -> Response:
+def delete_almacen(id_almacen: int, db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> Response:
     try:
         _require_row(
             db,
@@ -383,7 +383,7 @@ def get_producto(id_producto: int, db: Session = Depends(get_db)) -> dict[str, A
 
 
 @router.post("/productos", status_code=status.HTTP_201_CREATED)
-def create_producto(payload: dict[str, Any], db: Session = Depends(get_db)) -> dict[str, Any]:
+def create_producto(payload: dict[str, Any], db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> dict[str, Any]:
     nombre = _clean_text(payload.get("nombre"), "nombre", 2, 100)
     id_categoria = _clean_int(payload.get("idCategoria"), "idCategoria")
     id_proveedor = _clean_int(payload.get("idProveedor"), "idProveedor")
@@ -438,7 +438,7 @@ def create_producto(payload: dict[str, Any], db: Session = Depends(get_db)) -> d
 
 
 @router.put("/productos/{id_producto}")
-def update_producto(id_producto: int, payload: dict[str, Any], db: Session = Depends(get_db)) -> dict[str, Any]:
+def update_producto(id_producto: int, payload: dict[str, Any], db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> dict[str, Any]:
     nombre = _clean_text(payload.get("nombre"), "nombre", 2, 100)
     id_categoria = _clean_int(payload.get("idCategoria"), "idCategoria")
     id_proveedor = _clean_int(payload.get("idProveedor"), "idProveedor")
@@ -506,7 +506,7 @@ def update_producto(id_producto: int, payload: dict[str, Any], db: Session = Dep
 
 
 @router.delete("/productos/{id_producto}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_producto(id_producto: int, db: Session = Depends(get_db)) -> Response:
+def delete_producto(id_producto: int, db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> Response:
     try:
         _require_row(
             db,
@@ -523,7 +523,7 @@ def delete_producto(id_producto: int, db: Session = Depends(get_db)) -> Response
 
 
 @router.get("/inventario")
-def list_inventario(idAlmacen: int | None = None, bajoStock: bool | None = None, db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+def list_inventario(idAlmacen: int | None = None, bajoStock: bool | None = None, db: Session = Depends(get_db), _: UserRead = Depends(require_access_user)) -> list[dict[str, Any]]:
     try:
         conditions: list[str] = []
         params: dict[str, Any] = {}
@@ -559,7 +559,7 @@ def list_inventario(idAlmacen: int | None = None, bajoStock: bool | None = None,
 
 
 @router.get("/inventario/{id_producto}/{id_almacen}")
-def get_inventario(id_producto: int, id_almacen: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+def get_inventario(id_producto: int, id_almacen: int, db: Session = Depends(get_db), _: UserRead = Depends(require_access_user)) -> dict[str, Any]:
     try:
         return _require_row(
             db,
@@ -584,7 +584,7 @@ def get_inventario(id_producto: int, id_almacen: int, db: Session = Depends(get_
 
 
 @router.get("/inventario/bajo-stock")
-def list_inventario_bajo_stock(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+def list_inventario_bajo_stock(db: Session = Depends(get_db), _: UserRead = Depends(require_access_user)) -> list[dict[str, Any]]:
     try:
         rows = db.execute(
             text(
@@ -609,7 +609,7 @@ def list_inventario_bajo_stock(db: Session = Depends(get_db)) -> list[dict[str, 
 
 
 @router.post("/inventario/ajustes", status_code=status.HTTP_201_CREATED)
-def create_inventario_ajuste(payload: dict[str, Any], db: Session = Depends(get_db)) -> dict[str, Any]:
+def create_inventario_ajuste(payload: dict[str, Any], db: Session = Depends(get_db), _: UserRead = Depends(require_roles("admin"))) -> dict[str, Any]:
     id_producto = _clean_int(payload.get("idProducto"), "idProducto")
     id_almacen = _clean_int(payload.get("idAlmacen"), "idAlmacen")
     cantidad = payload.get("cantidad")
