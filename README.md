@@ -1,28 +1,63 @@
 # InvSys
 
-Sistema de inventarios con frontend en Vite/React y backend en FastAPI.
+Sistema de inventarios completo con:
 
-## Estructura
+- Backend en FastAPI + SQLAlchemy + MariaDB/MySQL.
+- Frontend en React + Vite.
+- Seguridad por roles (admin, almacenista, supervisor).
+- Base de datos con vistas, funciones, procedimientos y trigger.
 
-- `frontend/` - aplicación web
-- `backend/` - API FastAPI y SQL del sistema
-- `backend/sql/proyecto.sql` - script completo de base de datos
+## Estado actual del proyecto
+
+El proyecto ya esta integrado end-to-end:
+
+- Frontend conectado a API real (sin mocks para los modulos principales).
+- Login JWT y proteccion de rutas por rol.
+- CRUD funcional en categorias, proveedores, almacenes y productos.
+- Registro de movimientos con procedimiento almacenado.
+- Inventario e historial consumiendo reportes reales del backend.
+
+## Arquitectura
+
+- Frontend: [frontend](frontend)
+- Backend API: [backend](backend)
+- Contrato OpenAPI: [backend/openapi.contract.yaml](backend/openapi.contract.yaml)
+- SQL completo del proyecto: [backend/sql/proyecto.sql](backend/sql/proyecto.sql)
+
+## Estructura del repositorio
+
+```text
+InvSys/
+  backend/
+    app/
+      api/v1/endpoints/
+      core/
+      db/
+    scripts/
+    sql/
+    requirements.txt
+  frontend/
+    src/
+      app/
+      styles/
+    package.json
+  README.md
+```
 
 ## Requisitos
 
-- Node.js 20 o superior
+- Python 3.11+
+- Node.js 20+
 - pnpm
-- Python 3.11 o superior
-- MySQL o MariaDB
+- MariaDB o MySQL compatible con el SQL del proyecto
 
-## Instalación en Linux
+## Inicio rapido (local)
 
-### 1. Clonar y entrar al proyecto
+### 1. Base de datos
 
-```bash
-git clone <url-del-repositorio>
-cd InvSys
-```
+1. Crea una base llamada `sistemaInventarios` (o la que vayas a usar).
+2. Importa [backend/sql/proyecto.sql](backend/sql/proyecto.sql).
+3. Verifica usuarios/roles de prueba definidos por el script SQL.
 
 ### 2. Backend
 
@@ -36,115 +71,182 @@ cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
-El backend quedará disponible en:
+Backend disponible en:
 
 - `http://127.0.0.1:8000/`
 - `http://127.0.0.1:8000/health`
-- `http://127.0.0.1:8000/api/v1/auth/me`
 - `http://127.0.0.1:8000/api/v1/health/db`
-- `http://127.0.0.1:8000/docs`
+- `http://127.0.0.1:8000/docs` (si `EXPOSE_DOCS=true` y no estas en produccion)
 
 ### 3. Frontend
 
 ```bash
-cd ../frontend
+cd frontend
 pnpm install
+cp .env.example .env
 pnpm dev
 ```
 
-La aplicación web quedará disponible en:
+Frontend disponible en:
 
 - `http://127.0.0.1:5173/`
 
-## Instalación en Windows
+## Variables de entorno
 
-### 1. Clonar y entrar al proyecto
+### Backend (.env)
 
-```powershell
-git clone <url-del-repositorio>
-cd InvSys
-```
+Referencia: [backend/.env.example](backend/.env.example)
 
-### 2. Backend
+Variables clave:
 
-```powershell
-cd backend
-py -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-copy .env.example .env
-uvicorn app.main:app --reload
-```
+- `APP_NAME`
+- `APP_ENV` (`development` o `production`)
+- `DEBUG`
+- `DATABASE_URL`
+- `AUTH_SECRET_KEY`
+- `AUTH_ACCESS_TOKEN_MINUTES`
+- `AUTH_REFRESH_TOKEN_DAYS`
+- `CORS_ORIGINS`
+- `CORS_ALLOW_CREDENTIALS`
+- `TRUSTED_HOSTS`
+- `FORCE_HTTPS_REDIRECT`
+- `EXPOSE_DOCS`
 
-Si PowerShell bloquea la activación del entorno virtual, ejecuta esto una vez como administrador:
+### Frontend (.env)
 
-```powershell
-Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
+Referencia: [frontend/.env.example](frontend/.env.example)
 
-### 3. Frontend
+- `VITE_API_BASE_URL` (ejemplo: `http://127.0.0.1:8000/api/v1`)
+- `VITE_TOKEN_STORAGE` (`session` recomendado, o `local`)
 
-```powershell
-cd ..\frontend
-pnpm install
-pnpm dev
-```
+## Seguridad implementada
 
-## Base de datos
+Backend:
 
-1. Crea una base de datos en MySQL o MariaDB.
-2. Importa el archivo `backend/sql/proyecto.sql`.
-3. Ajusta la cadena de conexión en `backend/app/core/config.py` o en un archivo `.env`.
+- CORS configurable y restringido.
+- Trusted hosts middleware.
+- Security headers (`X-Frame-Options`, `X-Content-Type-Options`, etc.).
+- Redireccion HTTPS opcional (`FORCE_HTTPS_REDIRECT`).
+- Validaciones de configuracion para entorno productivo.
+- JWT firmado con HMAC SHA-256.
+- Control de acceso por rol en endpoints.
+- Logout autenticado.
 
-Ejemplo de variable de entorno:
+Frontend:
 
-```env
-DATABASE_URL=mysql+pymysql://usuario:password@localhost:3306/invsys
-```
+- Rutas protegidas por rol.
+- Manejo de sesion con token bearer.
+- Almacenamiento de token configurable (`session` por defecto).
+- Error boundary global para evitar pantalla de fallo cruda.
 
-## Configuración del backend
+## Roles y permisos de aplicacion
 
-El backend usa estos valores por defecto:
+- `admin`
+  - Gestion de usuarios.
+  - CRUD de catalogos.
+  - Ajustes de inventario.
+  - Registro y lectura de movimientos.
+  - Acceso a reportes.
 
-- `app_name`: `InvSys API`
-- `database_url`: `mysql+pymysql://root:password@localhost:3306/invsys`
-- `cors_origins`: `http://localhost:5173`
+- `almacenista`
+  - Consulta de catalogos e inventario.
+  - Registro de movimientos.
+  - Sin acceso a gestion de usuarios/catalogos administrativos.
 
-Si quieres cambiar la base de datos o el origen del frontend, edita `backend/app/core/config.py`.
+- `supervisor`
+  - Consulta de dashboard, inventario e historial.
+  - Sin operaciones de escritura.
 
-Contrato API inicial (OpenAPI): `backend/openapi.contract.yaml`
+## Objetos SQL del proyecto
 
-Para comprobar conexión a base de datos, usa este endpoint:
+Definidos en [backend/sql/proyecto.sql](backend/sql/proyecto.sql):
 
-- `GET /api/v1/health/db`
+- Vistas:
+  - `vista_inventario_actual`
+  - `vista_historial_movimientos`
+- Funciones:
+  - `fn_nivel_stock`
+  - `fn_consultar_inventario`
+- Procedimientos:
+  - `sp_registrar_movimiento_completo`
+  - `sp_consultar_inventario`
+- Trigger:
+  - `tr_evitar_stock_negativo`
 
-Si la conexión es correcta retorna `{"status": "ok", "database": "connected"}`.
+Uso desde API:
 
-### Verificación de roles y permisos (MariaDB)
+- Reportes en [backend/app/api/v1/endpoints/reports.py](backend/app/api/v1/endpoints/reports.py)
+- Movimientos transaccionales en [backend/app/api/v1/endpoints/movements.py](backend/app/api/v1/endpoints/movements.py)
 
-El backend debe usar una credencial técnica en `DATABASE_URL` (usuario de aplicación),
-mientras que la prueba de roles se hace con usuarios separados.
+## Endpoints principales
 
-1. Define en `backend/.env` estas variables:
+Routers registrados en [backend/app/api/v1/api.py](backend/app/api/v1/api.py):
 
-```env
-DB_TEST_ADMIN_URL=mysql+pymysql://admin_user:Admin123!@localhost:3307/sistemaInventarios
-DB_TEST_ALMACEN_URL=mysql+pymysql://almacen_user:Almacen123!@localhost:3307/sistemaInventarios
-DB_TEST_SUPER_URL=mysql+pymysql://super_user:Super123!@localhost:3307/sistemaInventarios
-```
+- Auth
+- Users
+- Catalogs (categorias, proveedores, productos, almacenes, inventario)
+- Movimientos
+- Reportes
+- Health
 
-2. Ejecuta el validador:
+Base path API:
 
-```bash
-cd backend
-python scripts/test_db_role_access.py
-```
+- `/api/v1`
 
-3. Si todo está bien, verás `PASS` en cada regla y resumen `N/N checks passed`.
+## Frontend: modulos funcionales
 
-## Notas
+Paginas principales en [frontend/src/app/pages](frontend/src/app/pages):
 
-- El frontend consume datos mockeados localmente.
-- El backend ya tiene estructura lista para conectar endpoints reales a la base de datos.
-- El SQL completo está dentro de `backend/sql/` para mantener el proyecto ordenado.
+- `Login`
+- `Dashboard`
+- `Productos`
+- `Proveedores`
+- `Almacenes`
+- `Categorias`
+- `Movimientos`
+- `Inventario` (incluye export CSV)
+- `Historial`
+
+## Pruebas y validaciones
+
+Actualmente el repositorio no incluye scripts de pruebas automatizadas dedicados.
+
+Validacion recomendada:
+
+1. Levantar backend y frontend.
+2. Probar autenticacion con los tres roles (`admin`, `almacenista`, `supervisor`).
+3. Verificar CRUD de catalogos y productos.
+4. Verificar registro de movimientos y reportes.
+
+## Despliegue recomendado
+
+### Opcion recomendada
+
+- Frontend en Vercel.
+- Backend FastAPI en Render/Railway/Fly/VM.
+- MariaDB/MySQL gestionada fuera de Vercel.
+
+### Nota importante sobre Vercel
+
+Vercel no hospeda MariaDB de forma nativa para este caso. La BD debe vivir en un servicio externo accesible por red.
+
+### Checklist minimo de produccion
+
+1. `APP_ENV=production`
+2. `DEBUG=false`
+3. `AUTH_SECRET_KEY` fuerte y unica
+4. `CORS_ORIGINS` con dominios reales
+5. `TRUSTED_HOSTS` con hostnames reales
+6. `FORCE_HTTPS_REDIRECT=true` (si tu infra termina TLS correctamente)
+7. `EXPOSE_DOCS=false`
+
+## Troubleshooting rapido
+
+- Error `401`: revisa token bearer o login.
+- Error `403`: rol insuficiente para endpoint/pagina.
+- Error `409` al borrar: hay relaciones activas (integridad referencial).
+- Error `ws://localhost:5173`: se cayo o reinicio el servidor de Vite, reinicia `pnpm dev`.
+
+## Licencia
+
+Uso academico/proyecto universitario.
