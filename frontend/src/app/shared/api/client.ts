@@ -2,24 +2,42 @@ type JsonObject = Record<string, unknown>;
 
 const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
 const TOKEN_STORAGE_KEY = 'invsys.accessToken';
+const DEFAULT_TOKEN_STORAGE = 'session';
+
+type TokenStorageMode = 'session' | 'local';
+
+function getTokenStorageMode(): TokenStorageMode {
+  const configured = (import.meta as ImportMeta & {
+    env: { VITE_TOKEN_STORAGE?: string };
+  }).env.VITE_TOKEN_STORAGE;
+
+  return configured === 'local' ? 'local' : DEFAULT_TOKEN_STORAGE;
+}
+
+function tokenStorage(): Storage {
+  return getTokenStorageMode() === 'local' ? window.localStorage : window.sessionStorage;
+}
 
 function getApiBaseUrl() {
   return (import.meta as ImportMeta & {
-    env: { VITE_API_BASE_URL?: string };
-  }).env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+    env: { VITE_API_BASE_URL?: string; VITE_API_URL?: string };
+  }).env.VITE_API_BASE_URL
+    ?? (import.meta as ImportMeta & { env: { VITE_API_URL?: string } }).env.VITE_API_URL
+    ?? DEFAULT_API_BASE_URL;
 }
 
 export function getStoredAccessToken() {
-  return window.localStorage.getItem(TOKEN_STORAGE_KEY);
+  return tokenStorage().getItem(TOKEN_STORAGE_KEY);
 }
 
 export function setStoredAccessToken(token: string | null) {
   if (token) {
-    window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    tokenStorage().setItem(TOKEN_STORAGE_KEY, token);
     return;
   }
 
   window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+  window.sessionStorage.removeItem(TOKEN_STORAGE_KEY);
 }
 
 export class ApiError extends Error {

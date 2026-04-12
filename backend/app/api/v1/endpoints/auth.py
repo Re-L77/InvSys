@@ -241,7 +241,7 @@ def refresh(payload: RefreshRequest) -> AuthResponse:
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout() -> Response:
+def logout(_: UserRead = Depends(require_access_user)) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
