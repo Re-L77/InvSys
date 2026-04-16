@@ -1,15 +1,29 @@
 import { useEffect, useState } from 'react';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { TipoBadge } from '../shared/components/TipoBadge';
-import { getHistorialMovimientos, type MovimientoHistorialRecord } from '../shared/api/inventory';
+import { getHistorialMovimientos, getAlmacenes, type MovimientoHistorialRecord, type AlmacenRecord } from '../shared/api/inventory';
 import { Filter } from 'lucide-react';
 
 export function Historial() {
   const [filterTipo, setFilterTipo] = useState('');
   const [filterAlmacen, setFilterAlmacen] = useState('');
+  const [filterFechaDesde, setFilterFechaDesde] = useState('');
+  const [filterFechaHasta, setFilterFechaHasta] = useState('');
   const [historial, setHistorial] = useState<MovimientoHistorialRecord[]>([]);
+  const [almacenes, setAlmacenes] = useState<AlmacenRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const loadAlmacenes = async () => {
+      try {
+        setAlmacenes(await getAlmacenes());
+      } catch {
+        console.error('No se pudieron cargar los almacenes');
+      }
+    };
+    void loadAlmacenes();
+  }, []);
 
   useEffect(() => {
     const loadHistorial = async () => {
@@ -17,7 +31,15 @@ export function Historial() {
       setError('');
 
       try {
-        setHistorial(await getHistorialMovimientos());
+        const idAlmacen = filterAlmacen ? Number(filterAlmacen) : undefined;
+        setHistorial(
+          await getHistorialMovimientos(
+            idAlmacen,
+            filterTipo || undefined,
+            filterFechaDesde || undefined,
+            filterFechaHasta || undefined
+          )
+        );
       } catch (requestError) {
         setError(requestError instanceof Error ? requestError.message : 'No se pudo cargar el historial');
       } finally {
@@ -26,13 +48,7 @@ export function Historial() {
     };
 
     void loadHistorial();
-  }, []);
-
-  const filteredHistorial = historial.filter(h => {
-    const matchesTipo = !filterTipo || h.tipo === filterTipo;
-    const matchesAlmacen = !filterAlmacen || h.almacen.toLowerCase().includes(filterAlmacen.toLowerCase());
-    return matchesTipo && matchesAlmacen;
-  });
+  }, [filterTipo, filterAlmacen, filterFechaDesde, filterFechaHasta]);
 
   const totalEntradas = historial.filter(h => h.tipo === 'entrada').length;
   const totalSalidas = historial.filter(h => h.tipo === 'salida').length;
@@ -69,10 +85,11 @@ export function Historial() {
     <DashboardLayout title="Historial de Movimientos">
       {/* Filters bar */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <div className="p-2 bg-gray-100 rounded-lg">
             <Filter size={20} className="text-gray-600" />
           </div>
+
           <select
             value={filterTipo}
             onChange={(e) => setFilterTipo(e.target.value)}
@@ -89,18 +106,46 @@ export function Historial() {
             className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] shadow-sm font-medium text-gray-700"
           >
             <option value="">Todos los almacenes</option>
-            <option value="almacén central">Almacén Central</option>
-            <option value="almacén norte">Almacén Norte</option>
-            <option value="almacén sur">Almacén Sur</option>
-            <option value="almacén este">Almacén Este</option>
-            <option value="almacén oeste">Almacén Oeste</option>
+            {almacenes.map(a => (
+              <option key={a.idAlmacen} value={String(a.idAlmacen)}>
+                {a.nombre}
+              </option>
+            ))}
           </select>
+
+          <input
+            type="date"
+            value={filterFechaDesde}
+            onChange={(e) => setFilterFechaDesde(e.target.value)}
+            className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] shadow-sm font-medium text-gray-700"
+          />
+
+          <input
+            type="date"
+            value={filterFechaHasta}
+            onChange={(e) => setFilterFechaHasta(e.target.value)}
+            className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] shadow-sm font-medium text-gray-700"
+          />
+
+          {(filterFechaDesde || filterFechaHasta || filterAlmacen || filterTipo) && (
+            <button
+              onClick={() => {
+                setFilterTipo('');
+                setFilterAlmacen('');
+                setFilterFechaDesde('');
+                setFilterFechaHasta('');
+              }}
+              className="px-4 py-3 bg-red-50 border border-red-200 rounded-xl font-medium text-red-600 hover:bg-red-100 transition-colors"
+            >
+              Limpiar filtros
+            </button>
+          )}
 
           <div className="flex-1"></div>
 
           <div className="px-4 py-2 bg-blue-50 rounded-xl border border-blue-200">
             <p className="text-sm font-semibold text-blue-700">
-              {filteredHistorial.length} movimientos encontrados
+              {historial.length} movimientos encontrados
             </p>
           </div>
         </div>
@@ -121,7 +166,7 @@ export function Historial() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredHistorial.map((h) => (
+              {historial.map((h) => (
                 <tr key={h.idMovimiento} className="hover:bg-gray-50 transition-colors">
                   <td className="py-4 px-6 text-sm text-gray-600">
                     {new Date(h.fecha).toLocaleString('es-MX', {

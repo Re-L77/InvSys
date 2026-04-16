@@ -92,8 +92,13 @@ export interface AlmacenPayload {
   nombre: string;
 }
 
-export async function getProductos() {
-  return apiRequest<ProductoRecord[]>('/productos');
+export async function getProductos(idCategoria?: number | null, idProveedor?: number | null, q?: string) {
+  const params = new URLSearchParams();
+  if (idCategoria) params.append('idCategoria', String(idCategoria));
+  if (idProveedor) params.append('idProveedor', String(idProveedor));
+  if (q) params.append('q', q);
+  const queryString = params.toString();
+  return apiRequest<ProductoRecord[]>(`/productos${queryString ? '?' + queryString : ''}`);
 }
 
 export async function createProducto(payload: ProductoPayload) {
@@ -128,12 +133,27 @@ export async function getProveedores() {
   return apiRequest<ProveedorRecord[]>('/proveedores');
 }
 
-export async function getInventario() {
-  return apiRequest<InventarioRecord[]>('/inventario');
+export async function getInventario(idAlmacen?: number | null, bajoStock?: boolean) {
+  const params = new URLSearchParams();
+  if (idAlmacen) params.append('idAlmacen', String(idAlmacen));
+  if (bajoStock) params.append('bajoStock', String(bajoStock));
+  const queryString = params.toString();
+  return apiRequest<InventarioRecord[]>(`/inventario${queryString ? '?' + queryString : ''}`);
 }
 
-export async function getHistorialMovimientos() {
-  return apiRequest<MovimientoHistorialRecord[]>('/reportes/historial-movimientos');
+export async function getHistorialMovimientos(
+  idAlmacen?: number | null,
+  tipo?: string,
+  fechaDesde?: string,
+  fechaHasta?: string
+) {
+  const params = new URLSearchParams();
+  if (idAlmacen) params.append('idAlmacen', String(idAlmacen));
+  if (tipo) params.append('tipo', tipo);
+  if (fechaDesde) params.append('fechaDesde', fechaDesde);
+  if (fechaHasta) params.append('fechaHasta', fechaHasta);
+  const queryString = params.toString();
+  return apiRequest<MovimientoHistorialRecord[]>(`/reportes/historial-movimientos${queryString ? '?' + queryString : ''}`);
 }
 
 export async function createCategoria(payload: CategoriaPayload) {

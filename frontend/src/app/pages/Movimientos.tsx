@@ -49,6 +49,17 @@ export function Movimientos() {
       return;
     }
 
+    // Validación de cantidad para salidas
+    if (tipo === 'salida' && cantidad > stockLocal) {
+      toast.error(`Stock insuficiente. Disponible: ${stockLocal} unidades, Solicitado: ${cantidad}`);
+      return;
+    }
+
+    if (cantidad <= 0) {
+      toast.error('La cantidad debe ser mayor que 0');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -280,12 +291,12 @@ export function Movimientos() {
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || (tipo === 'salida' && cantidad > stockLocal)}
                 className={`flex-1 px-6 py-4 text-white rounded-xl transition-all font-bold shadow-lg ${
                   tipo === 'entrada'
                     ? 'bg-gradient-to-r from-green-600 to-green-700 hover:shadow-green-500/50'
                     : 'bg-gradient-to-r from-red-600 to-red-700 hover:shadow-red-500/50'
-                } disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:shadow-lg`}
+                } disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-lg`}
               >
                 {isSubmitting ? 'Registrando...' : `Registrar ${tipo === 'entrada' ? 'Entrada' : 'Salida'}`}
               </button>

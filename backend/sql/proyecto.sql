@@ -264,7 +264,7 @@ GRANT 'admin_role' TO 'admin_user'@'10.0.2.2';
 GRANT 'almacenista_role' TO 'almacen_user'@'10.0.2.2';
 GRANT 'supervisor_role' TO 'super_user'@'10.0.2.2';
 
--- Establecer el rol por defecto para cada usuario (Sintaxis corregida para MariaDB)
+-- Establecer el rol por defecto para cada usuario 
 SET DEFAULT ROLE 'admin_role' FOR 'admin_user'@'localhost';
 SET DEFAULT ROLE 'almacenista_role' FOR 'almacen_user'@'localhost';
 SET DEFAULT ROLE 'supervisor_role' FOR 'super_user'@'localhost';
@@ -272,11 +272,6 @@ SET DEFAULT ROLE 'supervisor_role' FOR 'super_user'@'localhost';
 SET DEFAULT ROLE 'admin_role' FOR 'admin_user'@'10.0.2.2';
 SET DEFAULT ROLE 'almacenista_role' FOR 'almacen_user'@'10.0.2.2';
 SET DEFAULT ROLE 'supervisor_role' FOR 'super_user'@'10.0.2.2';
-
--- Nota de idempotencia:
--- Este script solo otorga permisos mínimos por rol. No se usan REVOKE porque
--- en MariaDB pueden fallar con ERROR 1147 si el privilegio no fue otorgado antes.
--- Al definir permisos mínimos desde GRANT evitamos ese error en ejecuciones repetidas.
 
 FLUSH PRIVILEGES;
 
@@ -469,41 +464,3 @@ WHERE fn_consultar_inventario(p.idProducto, 1) > 0;
 
 -- Uso de ambas funciones en el procedimiento sp_consultar_inventario
 CALL sp_consultar_inventario();
-
--- ------------------------------------------------------------------------------
--- 11. PRUEBAS DE ROLES (Acceso permitido y denegado)
--- ------------------------------------------------------------------------------
--- REQUERIMIENTO: "Todos los roles deben ser probados con ejemplos de acceso permitido y denegado."
--- Para ejecutar estas pruebas, conectarse con cada usuario desde otra sesión.
--- Ejemplo: mysql -u admin_user -p'Admin123!' sistemaInventarios
-
--- ========== PRUEBA 1: admin_user (Rol: admin_role -> acceso total) ==========
--- Acceso PERMITIDO:
---   SELECT * FROM Productos;                                              -> OK
---   CALL sp_registrar_movimiento_completo(1, 'admin', 'entrada', 1, 5);  -> OK
---   CALL sp_consultar_inventario();                                       -> OK
---   SELECT * FROM vista_inventario_actual;                                -> OK
---   INSERT INTO Categorias (nombre) VALUES ('Nueva');                     -> OK
--- Acceso exclusivo de admin:
---   DROP TABLE IF EXISTS test_temp;                                       -> OK (ALL PRIVILEGES)
-
--- ========== PRUEBA 2: almacen_user (Rol: almacenista_role -> registrar y consultar) ==========
--- Acceso PERMITIDO:
---   SELECT * FROM Productos;                                              -> OK
---   CALL sp_registrar_movimiento_completo(1, 'almacen', 'entrada', 1, 5);-> OK
---   CALL sp_consultar_inventario();                                       -> OK
--- Acceso DENEGADO:
---   SELECT * FROM Movimientos;                                            -> ERROR (sin permiso SELECT)
---   DELETE FROM Productos WHERE idProducto = 1;                           -> ERROR (sin permiso DELETE)
---   INSERT INTO Categorias (nombre) VALUES ('Hack');                      -> ERROR (sin permiso INSERT)
-
--- ========== PRUEBA 3: super_user (Rol: supervisor_role -> solo consulta) ==========
--- Acceso PERMITIDO:
---   SELECT * FROM vista_inventario_actual;                                -> OK
---   SELECT * FROM vista_historial_movimientos;                            -> OK
---   CALL sp_consultar_inventario();                                       -> OK
--- Acceso DENEGADO:
---   SELECT * FROM Productos;                                              -> ERROR (sin permiso directo)
---   CALL sp_registrar_movimiento_completo(1,'super','entrada',1,5);      -> ERROR (sin permiso EXECUTE)
---   INSERT INTO Productos (nombre,idCategoria,idProveedor,precio)
---     VALUES ('Hack',1,1,99);                                            -> ERROR (sin permiso INSERT)

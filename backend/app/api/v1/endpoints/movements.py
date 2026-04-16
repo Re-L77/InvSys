@@ -166,6 +166,13 @@ def create_movimiento(payload: dict[str, Any], db: Session = Depends(get_db), _:
         return _movement_detail(db, int(created["idMovimiento"]))
     except SQLAlchemyError as exc:
         db.rollback()
+        # Captura errores específicos del procedimiento
+        error_message = str(exc.orig) if hasattr(exc, 'orig') else str(exc)
+        if "Stock insuficiente" in error_message or "stock" in error_message.lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_message
+            )
         _handle_sql_error(exc)
 
 

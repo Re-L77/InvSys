@@ -3,7 +3,7 @@ import { DashboardLayout } from '../layouts/DashboardLayout';
 import { StockBadge } from '../shared/components/StockBadge';
 import { useAuth } from '../core/auth/AuthContext';
 import { Pencil, Trash2, Plus, Search } from 'lucide-react';
-import { createProducto, deleteProducto, getProductos, updateProducto, type ProductoRecord } from '../shared/api/inventory';
+import { createProducto, deleteProducto, getProductos, updateProducto, getCategorias, getProveedores, type ProductoRecord, type CategoriaRecord, type ProveedorRecord } from '../shared/api/inventory';
 import { getStockLevel } from '../shared/utils/inventory';
 import { toast } from 'sonner';
 
@@ -12,6 +12,10 @@ export function Productos() {
   const [productos, setProductos] = useState<ProductoRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterNivel, setFilterNivel] = useState('');
+  const [filterCategoria, setFilterCategoria] = useState('');
+  const [filterProveedor, setFilterProveedor] = useState('');
+  const [categorias, setCategorias] = useState<CategoriaRecord[]>([]);
+  const [proveedores, setProveedores] = useState<ProveedorRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -25,12 +29,27 @@ export function Productos() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    const loadCatalogos = async () => {
+      try {
+        const [cats, provs] = await Promise.all([getCategorias(), getProveedores()]);
+        setCategorias(cats);
+        setProveedores(provs);
+      } catch {
+        console.error('No se pudieron cargar categorías o proveedores');
+      }
+    };
+    void loadCatalogos();
+  }, []);
+
+  useEffect(() => {
     const loadProductos = async () => {
       setIsLoading(true);
       setError('');
 
       try {
-        setProductos(await getProductos());
+        const idCategoria = filterCategoria ? Number(filterCategoria) : null;
+        const idProveedor = filterProveedor ? Number(filterProveedor) : null;
+        setProductos(await getProductos(idCategoria || undefined, idProveedor || undefined, searchTerm || undefined));
       } catch (requestError) {
         setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar los productos');
       } finally {
@@ -39,17 +58,13 @@ export function Productos() {
     };
 
     void loadProductos();
-  }, []);
+  }, [searchTerm, filterCategoria, filterProveedor]);
 
   const isAdmin = currentUser?.role === 'admin';
 
-  const categorias = Array.from(new Map(productos.map(p => [p.idCategoria, p.categoriaNombre])).entries()).map(([idCategoria, nombre]) => ({ idCategoria, nombre }));
-  const proveedores = Array.from(new Map(productos.map(p => [p.idProveedor, p.proveedorNombre])).entries()).map(([idProveedor, nombre]) => ({ idProveedor, nombre }));
-
   const filteredProductos = productos.filter(p => {
-    const matchesSearch = p.nombre.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesNivel = !filterNivel || getStockLevel(p.stockTotal, p.stockMin) === filterNivel;
-    return matchesSearch && matchesNivel;
+    return matchesNivel;
   });
 
   const productosWithDetails = filteredProductos.map(p => {
@@ -60,7 +75,9 @@ export function Productos() {
   });
 
   const reloadData = async () => {
-    setProductos(await getProductos());
+    const idCategoria = filterCategoria ? Number(filterCategoria) : null;
+    const idProveedor = filterProveedor ? Number(filterProveedor) : null;
+    setProductos(await getProductos(idCategoria || undefined, idProveedor || undefined, searchTerm || undefined));
   };
 
   const openCreate = () => {
@@ -185,6 +202,32 @@ export function Productos() {
           </div>
 
           <select
+            value={filterCategoria}
+            onChange={(e) => setFilterCategoria(e.target.value)}
+            className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] shadow-sm font-medium text-gray-700"
+          >
+            <option value="">Todas las categorías</option>
+            {categorias.map(c => (
+              <option key={c.idCategoria} value={String(c.idCategoria)}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={filterProveedor}
+            onChange={(e) => setFilterProveedor(e.target.value)}
+            className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] shadow-sm font-medium text-gray-700"
+          >
+            <option value="">Todos los proveedores</option>
+            {proveedores.map(p => (
+              <option key={p.idProveedor} value={String(p.idProveedor)}>
+                {p.nombre}
+              </option>
+            ))}
+          </select>
+
+          <select
             value={filterNivel}
             onChange={(e) => setFilterNivel(e.target.value)}
             className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] shadow-sm font-medium text-gray-700"
@@ -194,6 +237,19 @@ export function Productos() {
             <option value="Medio">Medio</option>
             <option value="Bajo">Bajo</option>
           </select>
+
+          {(filterCategoria || filterProveedor || filterNivel) && (
+            <button
+              onClick={() => {
+                setFilterCategoria('');
+                setFilterProveedor('');
+                setFilterNivel('');
+              }}
+              className="px-4 py-3 bg-red-50 border border-red-200 rounded-xl font-medium text-red-600 hover:bg-red-100 transition-colors"
+            >
+              Limpiar
+            </button>
+          )}
 
           {isAdmin && (
             <button
