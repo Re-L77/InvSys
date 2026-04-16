@@ -1,6 +1,10 @@
 -- ==============================================================================
 -- PROYECTO 5: SISTEMA DE INVENTARIOS
 -- INTEGRANTES: 
+-- ORDAZ MAGOS JUAN PABLO
+-- GONZÁLEZ LEÓN ANDRÉS
+-- HUANTE RÍOS JOSÉ LUIS
+-- TREJO ZAVALA MARCO EDGAR
 -- MATERIA: Base de Datos Avanzadas 
 -- ==============================================================================
 
@@ -244,7 +248,7 @@ GRANT SELECT ON sistemaInventarios.vista_inventario_actual TO 'supervisor_role';
 GRANT SELECT ON sistemaInventarios.vista_historial_movimientos TO 'supervisor_role';
 GRANT EXECUTE ON PROCEDURE sistemaInventarios.sp_consultar_inventario TO 'supervisor_role';
 
--- Crear usuarios de ejemplo para las capturas de evidencia
+-- Crear usuarios
 CREATE USER IF NOT EXISTS 'admin_user'@'localhost' IDENTIFIED BY 'Admin123!';
 CREATE USER IF NOT EXISTS 'almacen_user'@'localhost' IDENTIFIED BY 'Almacen123!';
 CREATE USER IF NOT EXISTS 'super_user'@'localhost' IDENTIFIED BY 'Super123!';
@@ -256,6 +260,7 @@ CREATE USER IF NOT EXISTS 'admin_user'@'10.0.2.2' IDENTIFIED BY 'Admin123!';
 CREATE USER IF NOT EXISTS 'almacen_user'@'10.0.2.2' IDENTIFIED BY 'Almacen123!';
 CREATE USER IF NOT EXISTS 'super_user'@'10.0.2.2' IDENTIFIED BY 'Super123!';
 
+-- Concedemos roles
 GRANT 'admin_role' TO 'admin_user'@'localhost';
 GRANT 'almacenista_role' TO 'almacen_user'@'localhost';
 GRANT 'supervisor_role' TO 'super_user'@'localhost';
